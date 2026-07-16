@@ -16,6 +16,7 @@
   background: linear-gradient(180deg, #0f1a12 0%, #0c140e 100%);
   border-bottom: 1px solid #1a2a1a;
   z-index: 10;
+  flex-wrap: wrap;
 }
 
 .logo {
@@ -41,6 +42,86 @@
   font-size: 0.7rem;
   color: #6b8f6b;
   margin-top: -2px;
+}
+
+/* Species selector */
+.species-selector {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.species-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0.35rem 0.55rem;
+  background: #121a12;
+  border: 1px solid #1e3020;
+  border-radius: 8px;
+  color: #8aba8a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 58px;
+}
+
+.species-btn:hover {
+  background: #1a2a1a;
+  border-color: #2a4a2a;
+  color: #c0e8c0;
+}
+
+.species-btn.active {
+  background: #1a3a1a;
+  border-color: #4ade80;
+  color: #e0ffe0;
+  box-shadow: 0 0 10px #4ade8033;
+}
+
+.species-btn .emoji {
+  font-size: 1.15rem;
+}
+
+.species-btn .label {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+}
+
+/* Scale tabs */
+.scale-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+
+.scale-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #6a8a6a;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scale-tab:hover {
+  color: #a0c8a0;
+  background: #121a12;
+}
+
+.scale-tab.active {
+  color: #4ade80;
+  background: #142214;
+  border-color: #2a4a2a;
+}
+
+.scale-tab .icon {
+  font-size: 0.95rem;
 }
 
 /* Main layout */
@@ -152,6 +233,143 @@
   box-shadow: 0 0 6px #4ade80;
 }
 
+/* Controls */
+.control {
+  margin-bottom: 0.75rem;
+}
+
+.control label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #8aba8a;
+  margin-bottom: 0.3rem;
+}
+
+.control .val {
+  color: #c0e8c0;
+  font-variant-numeric: tabular-nums;
+}
+
+.control input[type='range'] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #1a2a1a;
+  border-radius: 2px;
+  outline: none;
+}
+
+.control input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4ade80;
+  cursor: pointer;
+  box-shadow: 0 0 6px #4ade8088;
+  border: 2px solid #0a1a0a;
+}
+
+/* Buttons */
+.btn-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border-radius: 7px;
+  border: 1px solid #2a4a2a;
+  background: #142214;
+  color: #a0c8a0;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:hover {
+  background: #1a321a;
+  color: #d0f0d0;
+}
+
+.btn.primary {
+  background: #1a3a22;
+  border-color: #4ade80;
+  color: #4ade80;
+}
+
+.btn.primary:hover {
+  background: #224a2a;
+  box-shadow: 0 0 12px #4ade8044;
+}
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.stat {
+  background: #0c160c;
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5a7a5a;
+}
+
+.stat-value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #c8e8c8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Water status bar */
+.status-bar {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #1a2a1a;
+}
+
+.status-label {
+  font-size: 0.7rem;
+  color: #7aba7a;
+  margin-bottom: 0.35rem;
+}
+
+.bar-track {
+  height: 8px;
+  background: #1a2a1a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.status-val {
+  font-size: 0.7rem;
+  color: #8aba8a;
+  text-align: right;
+  margin-top: 0.25rem;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .sidebar {
@@ -162,5 +380,8 @@
   }
   .logo h1 {
     font-size: 0.95rem;
+  }
+  .scale-tabs {
+    margin-left: 0;
   }
 }
