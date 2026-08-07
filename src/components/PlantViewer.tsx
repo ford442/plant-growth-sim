@@ -93,7 +93,7 @@ function ArchitectureView() {
 
   const { segments, leaves } = useMemo(() => {
     const str = generateLSystem(def.axiom, def.rules, iterations)
-    return interpretLSystem(str, def, iterations)
+    return interpretLSystem(str, def)
   }, [species, iterations, def])
 
   // gentle sway from wind
