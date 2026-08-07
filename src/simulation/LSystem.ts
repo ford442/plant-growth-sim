@@ -143,8 +143,7 @@ export interface Leaf {
 
 export function interpretLSystem(
   str: string,
-  def: LSystemDef,
-  maxIterations: number
+  def: LSystemDef
 ): { segments: Segment[]; leaves: Leaf[] } {
   const segments: Segment[] = []
   const leaves: Leaf[] = []
