@@ -24,6 +24,20 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`
 - `src/components/WeatherPanel.tsx` + `SimControls.tsx` — UI
 
+### Parasite mode (epic #3)
+- `src/simulation/parasite/stages.ts` — `LifeStage` + `STAGE_DEFS` (dimensions, speeds) and the **two-gear clock** (`advanceClocks`: action seconds for biomechanics, lesion hours for development)
+- `src/simulation/parasite/bfdSwitch.ts` — BFD1/BFD2 positive-feedback latency latch and the reactivation rule
+- `src/simulation/parasite/glideosome.ts` — periodic inward-traction kinematics on a true helix (not forward thrust)
+- `src/simulation/parasite/invasion.ts` — moving-junction FSM (MIC → orient → RON → AMA1–RON2 ring → PV)
+- `src/simulation/parasite/egress.ts` — FNT acidification → Ca²⁺ → TgPLP1 pores
+- `src/simulation/parasite/hostImmunity.ts` — IL-12/IFN-γ/IRG/NO/ROS fields, ROP effectors, tissue niches
+- `src/simulation/parasite/lifeCycleGraph.ts` — declarative stage transitions (research §12.1)
+- `src/simulation/parasite/world.ts` — the one pure `stepWorld()` over agents, cells, vacuoles, cysts and oocysts
+- `src/simulation/parasite/objectives.ts` + `modifiers.ts` — objective registry, ΔBFD1/Δplp1/ΔMIC2/terminal-latency modifiers, comparative Sarcocystidae
+- `src/stores/parasiteStore.ts` — sibling of `simStore`; holds state, forwards the clock, evaluates the objective
+- `src/components/ParasiteViewer.tsx` + `parasite/OrganelleView.tsx` + `ParasitePanels.tsx` — four view scales and the UI
+- Design lock: `docs/design/parasite-mode.md`
+
 ### Gem mode (epic #1)
 - `src/simulation/GemstonePresets.ts` — `GemstoneId` + `GEMSTONE_PRESETS` (face families, growth rules, stability field, kinetics, optics, colour)
 - `src/simulation/CrystalHabit.ts` — Miller indices → face poles under point-group symmetry; kinetic Wulff polyhedron (half-space clipping), volume/areas/extents
@@ -48,6 +62,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - 4 view modes (macro / architecture / cellular stub / roots stub)
 - 6 species presets
 - Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls
+- Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. 51 unit tests (`npm test`)
 
 ## Next High-Value Tasks
 1. Replace lineSegments with proper tube / instanced cylinder branches
@@ -64,12 +79,20 @@ npm install
 npm run dev
 ```
 
+Tests (pure simulation only, no DOM):
+```bash
+npm test
+```
+
 ### Gem follow-ups
 - TSL optical materials (IOR/dispersion/colour vs T) once the WebGPU path lands (#15, #19) — currently `MeshPhysicalMaterial`
 - Mineral–root co-evolution: soil mineral field, geodes near roots (#12 Phase 4, helps from #10)
 
 ## Notes for Agents
 - Do not break the Zustand tick loop
+- The parasite sim is pure and unit-tested — run `npm test` after touching `src/simulation/parasite/`
+- Parasite time is two gears (action seconds vs lesion hours); never collapse them into one clock without reading `docs/design/parasite-mode.md` §3
+- When adding a parasite stage, extend `LifeStage` + `STAGE_DEFS` and add its transitions to `LIFE_CYCLE`
 - When adding species, update both `SpeciesId` type and `SPECIES_LSYSTEMS`
 - When adding a gemstone, extend `GemstoneId` and `GEMSTONE_PRESETS`; add a structure to `STRUCTURES` in `CrystalLattice.ts` if it needs a new lattice, and check atom counts / bond lengths against literature
 - Growth rates are tuned to lab-synthesis scale (~0.1–1 mm/day) so they are watchable; stability fields are simplified curves

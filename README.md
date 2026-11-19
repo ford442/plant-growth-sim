@@ -60,6 +60,45 @@ Switch **🌿 Plants / 💎 Gems** in the header to grow crystals instead of pla
 
 The habit is a kinetic Wulff construction: each face family advances at its own normal growth velocity and the crystal is the intersection of the half-spaces.
 
+## Parasite mode
+
+Switch **🦠 Parasites** in the header for an in-browser *Toxoplasma gondii*
+life-cycle sim-game: the same multi-scale lab stack, but the organism is a
+stage machine running across soil, an intermediate host's tissue and a cat's
+gut. Design decisions and the time-scale mapping are in
+[`docs/design/parasite-mode.md`](docs/design/parasite-mode.md); every parameter
+traces to [`docs/research/toxoplasma-gondii-parameters.md`](docs/research/toxoplasma-gondii-parameters.md).
+
+### Systems
+
+| System | What it models |
+|---|---|
+| **Glideosome** | Gliding as periodic *inward traction*: a ring runs apex→posterior each cycle and the parasite pulls itself through it along a true helix, peaking at ~3 µm/s. Lose the adhesin (ΔMIC2) and the ring slips. |
+| **Moving junction** | The strict invasion sequence — MIC release → apical reorientation → RON2/4/5/8 injection → AMA1–RON2 ring → traction through the ring → sealed vacuole. ROM4/5 shed free AMA1 meanwhile, so dawdling costs the receptor. |
+| **BFD1 / BFD2** | The latency switch. Stress opens BFD1 translation, BFD1 drives BFD2, BFD2 promotes BFD1 — the loop latches and the cyst becomes irrevocable until host immunity collapses. |
+| **Egress** | FNT1/2 acidify the vacuole → Ca²⁺ spike → TgPLP1 oligomerises into ~100 Å pores → both membranes fail. Δplp1 stays trapped and the host destroys the cell instead. |
+| **Host immunity** | IL-12, IFN-γ, IRG, NO and ROS fields with a delayed adaptive arm; ROP16 polarises macrophages to M2, ROP18+ROP5 shield the vacuole from IRG, TgIST represses STAT1. |
+| **Niches** | Skeletal and cardiac muscle, retina, CNS cortex and amygdala, each with its own tropism weight and immune privilege. |
+
+### Views
+
+- **Soil** — the oocyst field: 1–5 day sporulation, then months of weathering
+- **Tissue** — host cells, vacuoles, cysts growing 5 → 70 µm, gliding parasites with their traction rings
+- **Cell / PV** — one vacuole: the rosette, the junction ring, the pores
+- **Organelle** — a tachyzoite cut open: 22 subpellicular microtubules, the 14-fibre conoid, apicoplast, rhoptries, micronemes
+
+### Objectives
+
+**Quiet tenant** (default — bank 8 mature cysts without killing the host),
+**Amygdala garden**, **Close the loop** (tissue → cat → soil → new host),
+**Oocyst winter** (365 shelf days), and **ΔBFD1 — runaway**. Challenge
+modifiers knock out BFD1, PLP1 or MIC2, or lock latency permanently
+(*Hammondia*-style). Four comparative Sarcocystidae presets are selectable.
+
+```bash
+npm test   # 51 tests over the pure simulation
+```
+
 ## Project Structure (target)
 
 ```

@@ -1,5 +1,6 @@
 import type { ViewScale } from '../App'
 import type { GemViewScale } from './CrystalViewer'
+import type { ParasiteViewScale } from './ParasiteViewer'
 
 export interface TabDef<T extends string> {
   id: T
@@ -18,6 +19,13 @@ export const GEM_TABS: TabDef<GemViewScale>[] = [
   { id: 'formation', label: 'Formation', icon: '⛰️' },
   { id: 'crystal', label: 'Crystal', icon: '💎' },
   { id: 'lattice', label: 'Lattice', icon: '⚛️' },
+]
+
+export const PARASITE_TABS: TabDef<ParasiteViewScale>[] = [
+  { id: 'environment', label: 'Soil', icon: '🌱' },
+  { id: 'tissue', label: 'Tissue', icon: '🫀' },
+  { id: 'cell', label: 'Cell / PV', icon: '🔬' },
+  { id: 'organelle', label: 'Organelle', icon: '🧫' },
 ]
 
 interface Props<T extends string> {

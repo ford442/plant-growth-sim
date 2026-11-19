@@ -77,8 +77,8 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 ## Track C — *Toxoplasma gondii* sim-game mode
 
 ### Status
-**Research ingested** into `docs/research/toxoplasma-gondii-parameters.md` (Gemini Deep Research).  
-**Epic GH issue: [#3](https://github.com/ford442/plant-growth-sim/issues/3).** **No simulation code yet.**
+**Parasite mode in code (2026-11-19).** C0–C5 all landed in one pass: design lock (`docs/design/parasite-mode.md`), pure stage FSM + BFD1 switch + `parasiteStore`, glideosome/moving-junction/egress biomechanics, host immunity fields + niches, four-scale `ParasiteViewer`, and the objective layer with challenge modifiers. 51 unit tests cover the pure sim (`npm test`).  
+**Epic GH issue: [#3](https://github.com/ford442/plant-growth-sim/issues/3).**
 
 ### Design intent
 Strange multi-scale **objective-driven** sim: play the life cycle (tachyzoite ↔ bradyzoite/cyst ↔ oocyst/sporozoite ↔ felid sexual stage) with biomechanically grounded systems (glideosome traction, moving junction, BFD1 lock, PLP1 egress) rather than generic “virus tycoon.”
@@ -93,40 +93,40 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ### Implementation phases (proposed)
 
-#### C0 — Design lock — [#9](https://github.com/ford442/plant-growth-sim/issues/9)
+#### C0 — Design lock — [#9](https://github.com/ford442/plant-growth-sim/issues/9) ✅
 - [x] Morphological parameter tables  
 - [x] Translational FSM / MJ / egress / BFD1 specs from research  
-- [ ] Art + tone (educational surreal vs clinical) + content framing  
-- [ ] Session time-scale mapping (7 h doubling → player time)  
-- [ ] First playable objective (recommend: “encyst without killing host”)  
+- [x] Art + tone (educational surreal, mechanism-first) + content framing  
+- [x] Session time-scale mapping — **two gears**: action seconds (4/s at 1×) and lesion hours (0.9/s at 1×), both shown in the HUD  
+- [x] First playable objective locked: **Quiet tenant** — 8 mature cysts, host above 20% health  
 
-#### C1 — Stage FSM + pure sim — [#8](https://github.com/ford442/plant-growth-sim/issues/8)
-- [ ] `LifeStage` enum + dimension presets  
-- [ ] Host types: intermediate tissue, felid enterocyte, environment  
-- [ ] Timers: endodyogeny ~7 h, sporulation 1–5 d, oocyst viability  
-- [ ] BFD1/BFD2 stress feedback (latency lock + reactivation on immunity collapse)  
+#### C1 — Stage FSM + pure sim — [#8](https://github.com/ford442/plant-growth-sim/issues/8) ✅
+- [x] `LifeStage` enum + dimension presets (`stages.ts`)  
+- [x] Host types: intermediate tissue, felid enterocyte, environment  
+- [x] Timers: endodyogeny ~7 h, sporulation 1–5 d, oocyst shelf life  
+- [x] BFD1/BFD2 stress feedback (latency lock + reactivation on immunity collapse)  
 
-#### C2 — Motility & invasion sandbox — [#4](https://github.com/ford442/plant-growth-sim/issues/4)
-- [ ] Glideosome helical inward-traction kinematics (not freeflight)  
-- [ ] MJ sequence: MIC → orient → RON/AMA1 ring → PV  
-- [ ] Egress: FNT acidify → Ca²⁺ → TgPLP1 pores  
+#### C2 — Motility & invasion sandbox — [#4](https://github.com/ford442/plant-growth-sim/issues/4) ✅
+- [x] Glideosome helical inward-traction kinematics (not freeflight)  
+- [x] MJ sequence: MIC → orient → RON/AMA1 ring → PV, with AMA1 shedding as a real failure mode  
+- [x] Egress: FNT acidify → Ca²⁺ → TgPLP1 pores, plus the Δplp1 trapped path  
 
-#### C3 — Host field + immunity game — [#5](https://github.com/ford442/plant-growth-sim/issues/5)
-- [ ] ROS / IL-12 / IFN-γ / IRG pressure fields  
-- [ ] ROP16 M2 debuff; ROP18/5 IRG shield; TgIST optional  
-- [ ] Tissue niches: muscle, retina, amygdala-weighted CNS  
+#### C3 — Host field + immunity game — [#5](https://github.com/ford442/plant-growth-sim/issues/5) ✅
+- [x] ROS / IL-12 / IFN-γ / IRG / NO pressure fields  
+- [x] ROP16 M2 debuff; ROP18/5 IRG shield; TgIST  
+- [x] Tissue niches: skeletal + cardiac muscle, retina, CNS cortex, amygdala  
 
-#### C4 — Multi-scale R3F views — [#6](https://github.com/ford442/plant-growth-sim/issues/6)
-- [ ] Macro host / environment map  
-- [ ] Tissue slice with cysts (5–70 µm growth)  
-- [ ] Single-cell PV + endodyogeny  
-- [ ] Organelle close-up (apicoplast, conoid 400×250 nm)  
+#### C4 — Multi-scale R3F views — [#6](https://github.com/ford442/plant-growth-sim/issues/6) ✅
+- [x] Environment / soil oocyst field  
+- [x] Tissue view with cysts (5–70 µm growth) and instanced zoites + traction rings  
+- [x] Single-cell PV with rosette, junction ring and PLP1 pores  
+- [x] Organelle close-up (22 MTs, 14-fibre conoid, apicoplast, rhoptries, micronemes)  
 
-#### C5 — Objectives & surreal win states — [#7](https://github.com/ford442/plant-growth-sim/issues/7)
-- [ ] Life-cycle completion (felid oocyst shed)  
-- [ ] Environmental oocyst endurance  
-- [ ] ΔBFD1 / ΔPLP1 challenge modifiers  
-- [ ] Optional comparative presets: *Neospora*, *Hammondia*, *Besnoitia*  
+#### C5 — Objectives & surreal win states — [#7](https://github.com/ford442/plant-growth-sim/issues/7) ✅
+- [x] Life-cycle completion (felid gametogony → oocyst shed → new host)  
+- [x] Environmental oocyst endurance (365 shelf days)  
+- [x] ΔBFD1 / Δplp1 / ΔMIC2 / terminal-latency challenge modifiers  
+- [x] Comparative presets: *Neospora*, *Hammondia*, *Besnoitia*  
 
 ### Bizarre / high-signal facts to keep in design (from research)
 - 22 subpellicular MTs + 14-fiber conoid; RNG2 loss → total immotility  
@@ -138,18 +138,18 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 - *H. hammondi* as “no reactivation” alternate mode  
 
 ### Acceptance criteria (v0 playable)
-- [ ] Switchable mode from plant UI without breaking plant tick loop  
-- [ ] At least tachyzoite / bradyzoite-cyst / oocyst states with correct relative scales  
-- [ ] One full lytic-cycle loop: invade → PV → replicate → egress  
-- [ ] One stress path into latency (BFD1)  
-- [ ] One documented objective with win/lose  
-- [ ] Parameters sourced/traceable to research doc  
+- [x] Switchable mode from plant UI without breaking plant tick loop  
+- [x] Tachyzoite / bradyzoite-cyst / oocyst states with correct relative scales  
+- [x] One full lytic-cycle loop: invade → PV → replicate → egress  
+- [x] One stress path into latency (BFD1)  
+- [x] Five documented objectives with win/lose  
+- [x] Parameters sourced/traceable to research doc  
 
 ---
 
 ## Cross-cutting
 
-- [x] Mode switcher in shell UI (`plant` | `gem`; `parasite` later)  
+- [x] Mode switcher in shell UI (`plant` | `gem` | `parasite`)  
 - [x] Shared time / pause / speed controls (`SimClock`)  
 - [ ] Docs Diátaxis later under `/docs` (tutorial / how-to / reference / explanation)  
 - [ ] Do not break Zustand plant tick loop when adding modes  
@@ -165,7 +165,16 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ---
 
+## Next for Track C
+
+- [ ] Felid gut deserves its own view scale (enterocytes + endopolygeny), currently reuses the tissue scene
+- [ ] Congenital / vertical transmission route (research §1, path 4)
+- [ ] TSL materials for the pellicle and cyst wall once the WebGPU path lands (#19)
+- [ ] Soil mineral field shared with gem mode (#12 Phase 4) — oocysts and geodes in one substrate
+
 ## Last updated
+
+- **2026-11-19** — Track C landed end to end: C0 design lock (`docs/design/parasite-mode.md`), C1–C5 implemented in `src/simulation/parasite/` + `parasiteStore` + `ParasiteViewer`, 51 unit tests. Plant and gem modes untouched.
 
 - **2026-08-12** — Created weekly plan; mirrored gem #1; ingested Gemini *T. gondii* research; opened parasite epic **#3**.  
 - **2026-08-12** — Filed child issues: parasite **#9–#4** (C0–C5 order: #9 C0, #8 C1, #4 C2, #5 C3, #6 C4, #7 C5); plant **#17 #18 #14 #13 #10 #19 #16**; gem **#11 #15 #12**.
