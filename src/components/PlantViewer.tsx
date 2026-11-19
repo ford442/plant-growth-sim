@@ -211,13 +211,8 @@ function MacroView() {
   )
 }
 
+// The simulation tick lives in <SimClock /> (shared with the gem viewer).
 export function PlantViewer({ scale }: Props) {
-  const tick = useSimStore((s) => s.tick)
-
-  useFrame((_, dt) => {
-    tick(dt)
-  })
-
   return (
     <>
       {scale === 'macro' && <MacroView />}

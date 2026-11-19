@@ -1,4 +1,11 @@
 import { create } from 'zustand'
+import { createCrystalState, stepCrystal, type CrystalState } from '../simulation/CrystalGrowth'
+import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
+
+export type { GemstoneId, GeologyState }
+
+/** Which organism the lab is simulating. */
+export type SimMode = 'plant' | 'gem'
 
 export type SpeciesId =
   | 'sunflower'
@@ -17,6 +24,9 @@ export interface WeatherState {
 }
 
 export interface SimState {
+  mode: SimMode
+  setMode: (m: SimMode) => void
+
   // identity
   species: SpeciesId
   setSpecies: (s: SpeciesId) => void
@@ -45,6 +55,15 @@ export interface SimState {
   // L-system iteration (for architecture view)
   lsystemIterations: number
   setLsystemIterations: (n: number) => void
+
+  // gemstone growth (pure state; geometry is derived in the views)
+  gemstone: GemstoneId
+  /** Switch gemstone: loads its formation conditions and reseeds the crystal. */
+  setGemstone: (g: GemstoneId) => void
+  geology: GeologyState
+  setGeology: (partial: Partial<GeologyState>) => void
+  crystal: CrystalState
+  resetCrystal: () => void
 }
 
 const defaultWeather: WeatherState = {
@@ -55,7 +74,12 @@ const defaultWeather: WeatherState = {
   wind: 1.2,
 }
 
+const defaultGemstone: GemstoneId = 'quartz'
+
 export const useSimStore = create<SimState>((set, get) => ({
+  mode: 'plant',
+  setMode: (mode) => set({ mode }),
+
   species: 'sunflower',
   setSpecies: (species) => set({ species }),
 
@@ -66,7 +90,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   pause: () => set({ isPlaying: false }),
   setSpeed: (speed) => set({ speed }),
   tick: (dt) => {
-    const { isPlaying, speed, weather, waterStatus } = get()
+    const { isPlaying, speed, weather, waterStatus, gemstone, geology } = get()
     if (!isPlaying) return
 
     const days = dt * speed
@@ -92,6 +116,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       ),
       growthRate: growth / Math.max(days, 0.001),
       lsystemIterations: Math.min(7, Math.floor(s.age / 3) + 2),
+      // crystals share the same clock (days), so plant and gem modes coexist
+      crystal: stepCrystal(s.crystal, gemstone, geology, days),
     }))
   },
   reset: () =>
@@ -118,4 +144,15 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   lsystemIterations: 2,
   setLsystemIterations: (n) => set({ lsystemIterations: n }),
+
+  gemstone: defaultGemstone,
+  setGemstone: (gemstone) => {
+    const geology = { ...GEMSTONE_PRESETS[gemstone].defaults }
+    set({ gemstone, geology, crystal: createCrystalState(gemstone, geology) })
+  },
+  geology: { ...GEMSTONE_PRESETS[defaultGemstone].defaults },
+  setGeology: (partial) => set((s) => ({ geology: { ...s.geology, ...partial } })),
+  crystal: createCrystalState(defaultGemstone, GEMSTONE_PRESETS[defaultGemstone].defaults),
+  resetCrystal: () =>
+    set((s) => ({ crystal: createCrystalState(s.gemstone, s.geology), isPlaying: true })),
 }))

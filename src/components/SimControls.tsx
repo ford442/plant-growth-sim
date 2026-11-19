@@ -1,10 +1,15 @@
+import { useMemo } from 'react'
 import { useSimStore } from '../stores/simStore'
+import { GEMSTONE_PRESETS } from '../simulation/GemstonePresets'
+import { specimenMetrics } from '../simulation/CrystalGrowth'
 
 export function SimControls() {
   const isPlaying = useSimStore((s) => s.isPlaying)
   const play = useSimStore((s) => s.play)
   const pause = useSimStore((s) => s.pause)
   const reset = useSimStore((s) => s.reset)
+  const resetCrystal = useSimStore((s) => s.resetCrystal)
+  const mode = useSimStore((s) => s.mode)
   const speed = useSimStore((s) => s.speed)
   const setSpeed = useSimStore((s) => s.setSpeed)
   const age = useSimStore((s) => s.age)
@@ -20,7 +25,7 @@ export function SimControls() {
         <button className="btn primary" onClick={isPlaying ? pause : play}>
           {isPlaying ? '⏸ Pause' : '▶ Play'}
         </button>
-        <button className="btn" onClick={reset}>
+        <button className="btn" onClick={mode === 'gem' ? resetCrystal : reset}>
           ↺ Reset
         </button>
       </div>
@@ -40,6 +45,9 @@ export function SimControls() {
         />
       </div>
 
+      {mode === 'gem' ? (
+        <CrystalStats />
+      ) : (
       <div className="stats-grid">
         <div className="stat">
           <span className="stat-label">Age</span>
@@ -57,6 +65,48 @@ export function SimControls() {
           <span className="stat-label">Growth</span>
           <span className="stat-value">{growthRate.toFixed(3)}</span>
         </div>
+      </div>
+      )}
+    </div>
+  )
+}
+
+function CrystalStats() {
+  const gemstone = useSimStore((s) => s.gemstone)
+  const crystal = useSimStore((s) => s.crystal)
+  const def = GEMSTONE_PRESETS[gemstone]
+  const m = useMemo(() => specimenMetrics(def, crystal.h), [def, crystal.h])
+  const rate = crystal.radialRate
+  return (
+    <div className="stats-grid">
+      <div className="stat">
+        <span className="stat-label">Age</span>
+        <span className="stat-value">{crystal.age.toFixed(1)} d</span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Length × width</span>
+        <span className="stat-value">
+          {m.length.toFixed(1)} × {m.width.toFixed(1)} mm
+        </span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Mass</span>
+        <span className="stat-value">{m.carats < 10 ? m.carats.toFixed(2) : m.carats.toFixed(1)} ct</span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Growth</span>
+        <span className="stat-value">
+          {rate >= 0 ? '+' : ''}
+          {(rate * 1000).toFixed(0)} µm/d
+        </span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Crystals</span>
+        <span className="stat-value">{crystal.nuclei.length}</span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Growth zones</span>
+        <span className="stat-value">{crystal.zones.length}</span>
       </div>
     </div>
   )
