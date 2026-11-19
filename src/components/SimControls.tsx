@@ -1,17 +1,19 @@
 import { useMemo } from 'react'
 import { useSimStore } from '../stores/simStore'
+import { useTimeStore } from '../stores/timeStore'
+import { useModeStore } from '../stores/modeStore'
 import { GEMSTONE_PRESETS } from '../simulation/GemstonePresets'
 import { specimenMetrics } from '../simulation/CrystalGrowth'
 
 export function SimControls() {
-  const isPlaying = useSimStore((s) => s.isPlaying)
-  const play = useSimStore((s) => s.play)
-  const pause = useSimStore((s) => s.pause)
+  const isPlaying = useTimeStore((s) => s.isPlaying)
+  const play = useTimeStore((s) => s.play)
+  const pause = useTimeStore((s) => s.pause)
   const reset = useSimStore((s) => s.reset)
   const resetCrystal = useSimStore((s) => s.resetCrystal)
-  const mode = useSimStore((s) => s.mode)
-  const speed = useSimStore((s) => s.speed)
-  const setSpeed = useSimStore((s) => s.setSpeed)
+  const mode = useModeStore((s) => s.mode)
+  const speed = useTimeStore((s) => s.speed)
+  const setSpeed = useTimeStore((s) => s.setSpeed)
   const age = useSimStore((s) => s.age)
   const height = useSimStore((s) => s.height)
   const biomass = useSimStore((s) => s.biomass)
@@ -45,7 +47,7 @@ export function SimControls() {
         />
       </div>
 
-      {mode === 'gem' ? (
+      {mode === 'parasite' ? null : mode === 'gem' ? (
         <CrystalStats />
       ) : (
       <div className="stats-grid">

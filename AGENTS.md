@@ -17,6 +17,8 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 
 ## Key Files
 - `src/stores/simStore.ts` — single source of truth for time, weather, plant status, gem state (`mode`, `gemstone`, `geology`, `crystal`)
+- `src/stores/modeStore.ts` — `mode: 'plant' | 'gem' | 'parasite'`; `src/stores/timeStore.ts` — shared play/pause + speed (one clock for all modes)
+- `src/rendering/` — renderer bootstrap (`rendererFactory`: WebGL for GLSL modes, WebGPU→WebGL2 fallback on request), capability probe, GPU-loss handling, `RendererLifecycle` (disposes renderer/device on Canvas unmount)
 - `src/components/SimClock.tsx` — the one `useFrame` that calls `tick(dt)`; plant and gem sims share this clock
 - `src/simulation/LSystem.ts` — rules + turtle interpreter per species
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`

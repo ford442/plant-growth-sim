@@ -1,11 +1,9 @@
 import { create } from 'zustand'
 import { createCrystalState, stepCrystal, type CrystalState } from '../simulation/CrystalGrowth'
 import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
+import { useTimeStore } from './timeStore'
 
 export type { GemstoneId, GeologyState }
-
-/** Which organism the lab is simulating. */
-export type SimMode = 'plant' | 'gem'
 
 export type SpeciesId =
   | 'sunflower'
@@ -24,20 +22,12 @@ export interface WeatherState {
 }
 
 export interface SimState {
-  mode: SimMode
-  setMode: (m: SimMode) => void
-
   // identity
   species: SpeciesId
   setSpecies: (s: SpeciesId) => void
 
-  // time
+  // time (play/pause + speed live in timeStore, shared by every mode)
   time: number // simulation days
-  isPlaying: boolean
-  speed: number // days per real second
-  play: () => void
-  pause: () => void
-  setSpeed: (s: number) => void
   tick: (dt: number) => void
   reset: () => void
 
@@ -77,20 +67,13 @@ const defaultWeather: WeatherState = {
 const defaultGemstone: GemstoneId = 'quartz'
 
 export const useSimStore = create<SimState>((set, get) => ({
-  mode: 'plant',
-  setMode: (mode) => set({ mode }),
-
   species: 'sunflower',
   setSpecies: (species) => set({ species }),
 
   time: 0,
-  isPlaying: true,
-  speed: 0.5,
-  play: () => set({ isPlaying: true }),
-  pause: () => set({ isPlaying: false }),
-  setSpeed: (speed) => set({ speed }),
   tick: (dt) => {
-    const { isPlaying, speed, weather, waterStatus, gemstone, geology } = get()
+    const { isPlaying, speed } = useTimeStore.getState()
+    const { weather, waterStatus, gemstone, geology } = get()
     if (!isPlaying) return
 
     const days = dt * speed
@@ -120,7 +103,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       crystal: stepCrystal(s.crystal, gemstone, geology, days),
     }))
   },
-  reset: () =>
+  reset: () => {
+    useTimeStore.getState().play()
     set({
       time: 0,
       age: 0,
@@ -129,8 +113,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       waterStatus: 0.85,
       growthRate: 0,
       lsystemIterations: 2,
-      isPlaying: true,
-    }),
+    })
+  },
 
   weather: defaultWeather,
   setWeather: (partial) =>
@@ -153,6 +137,8 @@ export const useSimStore = create<SimState>((set, get) => ({
   geology: { ...GEMSTONE_PRESETS[defaultGemstone].defaults },
   setGeology: (partial) => set((s) => ({ geology: { ...s.geology, ...partial } })),
   crystal: createCrystalState(defaultGemstone, GEMSTONE_PRESETS[defaultGemstone].defaults),
-  resetCrystal: () =>
-    set((s) => ({ crystal: createCrystalState(s.gemstone, s.geology), isPlaying: true })),
+  resetCrystal: () => {
+    useTimeStore.getState().play()
+    set((s) => ({ crystal: createCrystalState(s.gemstone, s.geology) }))
+  },
 }))
