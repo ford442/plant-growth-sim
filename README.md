@@ -40,6 +40,26 @@ A beautiful, educational, and scientifically grounded web app that lets you:
 | Grass / Bamboo | Monocot | Tillering, rapid vertical growth |
 | Vine (e.g. Ivy) | Climber | Thigmotropism, search for support |
 
+## Gem mode
+
+Switch **🌿 Plants / 💎 Gems** in the header to grow crystals instead of plants (same clock and playback controls).
+
+| Gemstone | Mineral · system | Distinct growth rule |
+|----------|------------------|----------------------|
+| Rock crystal | Quartz · trigonal (32) | Long m-prisms with r > z rhombohedra; above the α–β inversion it grows hexagonal bipyramids |
+| Amethyst | Quartz · trigonal | Stubby geode points; Fe poisons the prism; colour bleaches irreversibly to citrine when heated |
+| Diamond | Diamond · cubic (m-3m) | Cube → cubo-octahedron → octahedron with temperature; resorbs into dodecahedroids outside its field |
+| Ruby | Corundum · trigonal (-3m) | Barrel bipyramids when cool, flat hexagonal tablets when hot; Cr³⁺ pink → red |
+| Emerald | Beryl · hexagonal (6/mmm) | Flat-topped prisms that lengthen with supersaturation |
+| Topaz | Topaz · orthorhombic (mmm) | Rhombic prisms with dome/dipyramid wedges |
+
+- **Formation** — crystals nucleate on matrix rock / a geode / kimberlite (classical nucleation: high saturation → crowded druse)
+- **Crystal** — one specimen with refractive optics, Miller-index face labels and growth phantoms recorded whenever conditions change
+- **Lattice** — real unit cells (diamond, α-quartz, corundum, beryl, topaz) growing layer by layer via spiral step-flow, 2D island nucleation or kinetic roughening, with frozen-in vacancies and dopants
+- Controls: temperature, pressure (log), saturation, dopant level, plus a clickable P–T stability diagram
+
+The habit is a kinetic Wulff construction: each face family advances at its own normal growth velocity and the crystal is the intersection of the half-spaces.
+
 ## Project Structure (target)
 
 ```
