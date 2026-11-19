@@ -58,7 +58,7 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 ## Track B — Gemstone growth ([#1](https://github.com/ford442/plant-growth-sim/issues/1))
 
 ### Status
-**Documented as open GH issue #1** (full implementation plan). Not started in code.
+**Gem mode in code (2026-11-19).** Phase 1 (#11) done; crystal-system habits from #15 and the lattice view + defects / layer growth from #12 Phase 3 done. Open: TSL optical materials (#15, waits on #19), mineral–root co-evolution (#12 Phase 4).
 
 ### Plan summary (mirror of #1)
 - Phase 1: [#11](https://github.com/ford442/plant-growth-sim/issues/11) `CrystalGrowth.ts`, `GemstoneId` + `GEMSTONE_PRESETS`, env fields, prism/octahedra instances  
@@ -66,11 +66,11 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - Phase 3–4: [#12](https://github.com/ford442/plant-growth-sim/issues/12) atomic/defect cross-sections + soil mineral field + root/geode co-evolution  
 
 ### Acceptance (from #1)
-- [ ] ≥3 gem types with distinct growth rules  
-- [ ] Macro / structure / lattice views  
-- [ ] T, pressure, saturation controls  
-- [ ] Performance budget respected  
-- [ ] Conventions match plant path  
+- [x] ≥3 gem types with distinct growth rules (6)  
+- [x] Macro / structure / lattice views  
+- [x] T, pressure, saturation controls (+ dopant, P–T diagram)  
+- [x] Performance budget respected (~2 ms JS / frame)  
+- [x] Conventions match plant path  
 
 ---
 
@@ -149,8 +149,8 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ## Cross-cutting
 
-- [ ] Mode switcher in shell UI (`plant` | `gem` | `parasite`) — only when second mode is non-stub  
-- [ ] Shared time / pause / speed controls  
+- [x] Mode switcher in shell UI (`plant` | `gem`; `parasite` later)  
+- [x] Shared time / pause / speed controls (`SimClock`)  
 - [ ] Docs Diátaxis later under `/docs` (tutorial / how-to / reference / explanation)  
 - [ ] Do not break Zustand plant tick loop when adding modes  
 
