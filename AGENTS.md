@@ -18,12 +18,13 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 ## Key Files
 - `src/stores/simStore.ts` — single source of truth for time, weather, plant status, gem state (`mode`, `gemstone`, `geology`, `crystal`)
 - `src/stores/modeStore.ts` — `mode: 'plant' | 'gem' | 'parasite'`; `src/stores/timeStore.ts` — shared play/pause + speed (one clock for all modes)
-- `src/rendering/` — renderer bootstrap (`rendererFactory`: WebGL for GLSL modes, WebGPU→WebGL2 fallback on request), capability probe, GPU-loss handling, `RendererLifecycle` (disposes renderer/device on Canvas unmount)
+- `src/rendering/` — renderer bootstrap (`rendererFactory`: classic WebGL by default; `webgpu` = `WebGPURenderer`, on its WebGL2 backend without an adapter, and a plain `WebGLRenderer` if that fails), capability probe, `rendererPreference.ts` (`?renderer=webgpu`; `NODE_READY_MODES` = which modes may use it), `describeRenderer()` (what is *actually* running), GPU-loss handling, `RendererLifecycle` (reports the active renderer + GPU-loss handlers; it must **not** dispose the renderer — R3F does, and doing it twice blanks the canvas under StrictMode). `src/stores/rendererStore.ts` + `components/RendererPanel.tsx` are the UI side. Design + upgrade path: `docs/design/webgpu-tsl.md`
 - `src/components/plantExport.ts` — GLB export of the on-screen plant scene (`registerPlantRoot` from PlantViewer; button in SimControls). v0: static snapshot, no animation tracks, branches as LINES until tube branches land, leaves via EXT_mesh_gpu_instancing, plain PBR colours
 - `src/components/SimClock.tsx` — the one `useFrame` that calls `tick(dt)`; plant and gem sims share this clock
 - `src/simulation/LSystem.ts` — rules + turtle interpreter per species (deterministic: leaf sizes come from `hash01`, never `Math.random`; segments/leaves carry the `src` symbol index that produced them)
 - `src/simulation/LSystemMorph.ts` — pure smooth growth between L-system iterations: lineage through the rewrite, `createMorphBuilder().morph(n)` → `from`/`to` typed arrays, `sampleSegments` / `sampleLeaves` at any `t`, plus `advanceDevelopment` (the weather-driven development clock) and `morphFactor`
 - `src/components/plant/` — viewer side of the morph: `MorphedPlant.ts` (dynamic branch geometry + leaf instance buffer, re-posed in place, one shared instance per species+stage via `getMorphedPlant`) and `leafMatrix.ts` (hand-expanded `lookAt` + `rotateX(π/2)`, pinned to three.js by a test)
+- `src/components/plant/leafAppearance.ts` (pure, tested: weather + plant status → chlorophyll / wetness / translucency / flutter), `useLeafNodeMaterial.ts` (loads and feeds the TSL leaf material; `null` on classic WebGL → `PlantViewer` draws `meshStandardMaterial`) and `tsl/leafNodeMaterial.ts` (the TSL `MeshSSSNodeMaterial`; **only ever loaded through dynamic `import()`**)
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`
 - `src/components/WeatherPanel.tsx` + `SimControls.tsx` — UI
 
@@ -84,7 +85,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 3. ~~Smooth growth interpolation (lerp between L-system generations)~~ (done: `LSystemMorph.ts`; the sim exposes a continuous `lsystemProgress`, the view blends generation `floor(progress)` into the next by its fractional part)
 4. ~~Real cellular cross-section with animated division~~ (done, #13: `TissueGrowth.ts` + cellular view; next: stomata / leaf tissue, anticlinal divisions to widen the cambium)
 5. ~~Soil moisture field~~ (done with the soil mineral field, `SoilField.ts`) + animated water particles into roots
-6. WebGPU / TSL upgrade path
+6. ~~WebGPU / TSL upgrade path~~ (path documented and prototyped, #19: opt-in `?renderer=webgpu`, TSL leaf material; next: verify on a native WebGPU device, tune translucency/gloss, TSL stems once tube branches land, port gem/parasite modes — see `docs/design/webgpu-tsl.md` §8–9)
 7. ~~Export current plant as GLB~~ (v0 done; revisit after tube branches)
 
 ## Running Locally
@@ -117,5 +118,6 @@ npm test
 - Growth rates are tuned to lab-synthesis scale (~0.1–1 mm/day) so they are watchable; stability fields are simplified curves
 - The soil sim is pure and unit-tested (`SoilField.test.ts`, plus coupling tests in `simStore.test.ts`) — run `npm test` after touching it. Plant water comes *only* through the soil now: `waterStatus` relaxes towards `soil.supply` (uptake ÷ transpiration demand), and growth rate is temp × light × water × `nutrientStatus`. Do not add a direct rain → waterStatus shortcut again
 - Soil units: `water` is a fraction of a cell's original pore space (≤ 1 − cement); solutes are stored as amounts (concentration × water) so drying concentrates them; saturation S = c / c_eq. A hardpan (cement ≥ `HARDPAN`) stops roots that have not reached it (`rootReach` per column) — one forming around established roots does not cut them off
+- TSL / node materials: load via dynamic `import()` only (a static `three/webgpu` or `three/tsl` import drags the whole WebGPU build into the default bundle), check `describeRenderer()` before using one, always keep a classic-material fallback, drive them with uniforms, and keep `color`/`roughness` mirrored on the material so GLB export still works. Before adding a mode to `NODE_READY_MODES`, walk every view with `?renderer=webgpu` and a console open (`THREE.LineLoop` is unsupported there — that is why the cellular frame is `lineSegments`). Full checklist: `docs/design/webgpu-tsl.md` §5, §8
 - Prefer small, focused PRs
 - Keep performance in mind (instancing, frustum culling later)

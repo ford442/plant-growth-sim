@@ -44,7 +44,7 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - [x] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations) — `LSystemMorph.ts` (lineage through the rewrite; trunk stretches, side branches peel off, buds grow out of their parent, new leaves fade in) driven by the weather-coupled `lsystemProgress`  
 - [x] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division — `TissueGrowth.ts` (cambium / xylem / phloem files, growth rings, drought slows division and enlargement) + cellular view with stem disc and cell lens  
 - [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots — moisture field done with #12 Phase 4 (`SoilField.ts`, Roots view); water particles still open  
-- [ ] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path  
+- [x] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path — documented in `docs/design/webgpu-tsl.md`; opt-in (`?renderer=webgpu`) WebGPU→WebGL2→WebGL fallback chain and a TSL leaf material (veins, chlorophyll, translucency, wetness, wind). Not yet verified on a native WebGPU device  
 - [ ] [#16](https://github.com/ford442/plant-growth-sim/issues/16) Export plant as GLB  
 
 ### Done (baseline)

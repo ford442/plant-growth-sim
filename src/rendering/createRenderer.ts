@@ -2,17 +2,33 @@
  * Renderer bootstrap (trimmed port of ford442/watershed
  * `src/rendering/createRenderer.ts`), shaped as an R3F `gl` factory.
  *
- * - `webgl`: classic `WebGLRenderer` (GLSL materials). Plant and gem modes use
- *   this so they render exactly as before.
+ * - `webgl`: classic `WebGLRenderer` (GLSL materials). The default for every
+ *   mode, so nothing changes unless a node-ready mode opts in.
  * - `webgpu`: `WebGPURenderer` from `three/webgpu` when the probe found an
- *   adapter, otherwise the same renderer on its WebGL2 backend. Only modes whose
- *   materials are node/TSL-compatible (parasite, later) should ask for it.
+ *   adapter, otherwise the same renderer on its WebGL2 backend (TSL node
+ *   materials compile to GLSL there). If the module cannot be loaded or the
+ *   renderer cannot initialise, it falls back to the classic `WebGLRenderer`.
+ *   Only modes whose materials are node/TSL-compatible may ask for it — see
+ *   `NODE_READY_MODES` in `rendererPreference.ts`.
+ *
+ * What actually came up is reported by `describeRenderer()`; materials that
+ * only exist as node materials must check it rather than assume the request
+ * was honoured (docs/design/webgpu-tsl.md).
  */
 import * as THREE from 'three'
 import type { GLProps } from '@react-three/fiber'
 import type { GraphicsCapability } from './probeGraphicsCapability'
 
 export type RendererBackend = 'webgl' | 'webgpu'
+
+/**
+ * What is really rendering, which can differ from what was asked for:
+ * - `webgl`: classic `WebGLRenderer` (no node materials)
+ * - `webgpu`: `WebGPURenderer` on a real WebGPU device
+ * - `webgl2-nodes`: `WebGPURenderer` on its WebGL2 backend — node/TSL
+ *   materials work, WebGPU-only features (compute, storage buffers) do not
+ */
+export type ActiveRenderer = 'webgl' | 'webgpu' | 'webgl2-nodes'
 
 export interface RendererOptions {
   backend: RendererBackend
@@ -27,17 +43,24 @@ export function rendererFactory({ backend, capability }: RendererOptions): GLPro
     const canvas = props.canvas as HTMLCanvasElement
 
     if (backend === 'webgpu') {
-      // dynamic import keeps the WebGPU build out of the plant-mode bundle path
-      const { WebGPURenderer } = await import('three/webgpu')
-      const renderer = new WebGPURenderer({
-        canvas,
-        antialias,
-        powerPreference: powerPreference === 'default' ? undefined : powerPreference,
-        forceWebGL: !capability.webgpu,
-      })
-      await renderer.init()
-      // R3F types its root renderer as WebGLRenderer; WebGPURenderer is accepted at runtime
-      return renderer as unknown as THREE.WebGLRenderer
+      try {
+        // dynamic import keeps the WebGPU build out of the default bundle path
+        const { WebGPURenderer } = await import('three/webgpu')
+        const renderer = new WebGPURenderer({
+          canvas,
+          antialias,
+          powerPreference: powerPreference === 'default' ? undefined : powerPreference,
+          forceWebGL: !capability.webgpu,
+        })
+        await renderer.init()
+        // R3F types its root renderer as WebGLRenderer; WebGPURenderer is accepted at runtime
+        return renderer as unknown as THREE.WebGLRenderer
+      } catch (err) {
+        // A failed chunk load or adapter/device request leaves the canvas untouched,
+        // so the classic renderer can still take it. (If init() had already claimed a
+        // 'webgpu' context the canvas could not be reused and this would throw too.)
+        console.warn('[Renderer] WebGPURenderer unavailable — using WebGLRenderer', err)
+      }
     }
 
     return new THREE.WebGLRenderer({
@@ -51,18 +74,9 @@ export function rendererFactory({ backend, capability }: RendererOptions): GLPro
   }
 }
 
-/**
- * Release GPU resources owned by a renderer the Canvas is done with. R3F's own
- * unmount already forces WebGL context loss; this covers what it doesn't:
- * renderer-held resources and, for WebGPU, the device itself.
- */
-export function disposeRenderer(renderer: unknown): void {
-  const r = renderer as {
-    dispose?: () => void
-    isWebGPURenderer?: boolean
-    backend?: { isWebGPUBackend?: boolean; device?: { destroy?: () => void } }
-  }
-  const device = r.isWebGPURenderer && r.backend?.isWebGPUBackend ? r.backend.device : undefined
-  r.dispose?.()
-  device?.destroy?.()
+/** Which renderer a Canvas ended up with (see {@link ActiveRenderer}). */
+export function describeRenderer(renderer: unknown): ActiveRenderer {
+  const r = renderer as { isWebGPURenderer?: boolean; backend?: { isWebGPUBackend?: boolean } } | null
+  if (!r?.isWebGPURenderer) return 'webgl'
+  return r.backend?.isWebGPUBackend ? 'webgpu' : 'webgl2-nodes'
 }

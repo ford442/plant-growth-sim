@@ -18,8 +18,8 @@ A beautiful, educational, and scientifically grounded web app that lets you:
 
 ### Core Tech Stack (planned)
 - **Vite + React 19 + TypeScript**
-- **React Three Fiber + Three.js + WebGPU** (preferred for performance & modern shaders)
-- **TSL (Three Shading Language)** for music-reactive / weather-reactive plant shaders
+- **React Three Fiber + Three.js + WebGPU** (preferred for performance & modern shaders) — optional and opt-in so far, see [WebGPU / TSL](#webgpu--tsl-experimental)
+- **TSL (Three Shading Language)** for music-reactive / weather-reactive plant shaders (first one: the leaf material)
 - L-systems + parametric / functional-structural plant models (FSPM)
 - Simple soil moisture + root architecture model
 - Weather engine (temperature, RH, PAR, precipitation, wind)
@@ -142,6 +142,21 @@ modifiers knock out BFD1, PLP1 or MIC2, or lock latency permanently
 npm test   # 51 tests over the pure simulation
 ```
 
+## WebGPU / TSL (experimental)
+
+The app renders with the classic WebGL renderer by default. To try the
+WebGPU renderer and the first TSL node material (plant leaves: veins,
+chlorophyll loss, back-scattered light, rain wetness, wind flutter), open the
+app with **`?renderer=webgpu`** or use the **Renderer** panel in the plant
+sidebar.
+
+- **Never required.** With no WebGPU adapter the same renderer runs on its WebGL2
+  backend; if even that fails to load, the app falls back to `WebGLRenderer`.
+- **Plant mode only** for now; gem and parasite modes always use WebGL.
+- Audit of the dependency versions, the fallback chain, what was and was not
+  verified, and the steps to port another mode:
+  [`docs/design/webgpu-tsl.md`](docs/design/webgpu-tsl.md).
+
 ## Project Structure (target)
 
 ```
@@ -201,7 +216,7 @@ npm run dev
 - [ ] Root hair detail
 
 ### Phase 3 – Polish & Export
-- [ ] Beautiful TSL shaders (translucency, chlorophyll, rain droplets, etc.)
+- [ ] Beautiful TSL shaders (translucency, chlorophyll, rain droplets, etc.) — leaf prototype done (veins, chlorophyll, wetness, wind, back-scatter); stems and droplets open
 - [ ] Time-lapse recording / export GLB of current plant
 - [ ] Educational tooltips + glossary
 - [ ] Mobile / touch friendly controls

@@ -33,7 +33,9 @@ import { useSimStore } from './stores/simStore'
 import { useModeStore } from './stores/modeStore'
 import { useTimeStore } from './stores/timeStore'
 import { useParasiteStore } from './stores/parasiteStore'
-import { RendererLifecycle, rendererFactory, useGraphicsCapability } from './rendering'
+import { useRendererStore } from './stores/rendererStore'
+import { RendererPanel } from './components/RendererPanel'
+import { RendererLifecycle, backendForMode, rendererFactory, useGraphicsCapability } from './rendering'
 import { GEMSTONE_PRESETS } from './simulation/GemstonePresets'
 import { SOIL_PROFILES } from './simulation/SoilField'
 import { COMPARTMENT_LABEL } from './simulation/parasite/stages'
@@ -75,6 +77,10 @@ function App() {
   const crystalStatus = useSimStore((s) => s.crystal.status)
   const isPlaying = useTimeStore((s) => s.isPlaying)
   const capability = useGraphicsCapability()
+  // WebGL unless the user opted in *and* this mode is node/TSL-ready (see rendererPreference.ts)
+  const rendererPreference = useRendererStore((s) => s.preference)
+  const setActiveRenderer = useRendererStore((s) => s.setActive)
+  const backend = backendForMode(mode, rendererPreference)
   // bumping the key remounts the Canvas with a fresh renderer after device loss
   const [canvasKey, setCanvasKey] = useState(0)
   const remountCanvas = useCallback(() => setCanvasKey((k) => k + 1), [])
@@ -110,13 +116,13 @@ function App() {
         <div className="viewport">
           {capability && (
           <Canvas
-            key={canvasKey}
+            // the `gl` factory only runs when the Canvas is created, so a backend change remounts it
+            key={`${canvasKey}:${backend}`}
             camera={{ position: [0, 4, 8], fov: 45 }}
             dpr={[1, 2]}
-            // every mode uses GLSL materials → classic WebGL renderer (unchanged look)
-            gl={rendererFactory({ backend: 'webgl', capability })}
+            gl={rendererFactory({ backend, capability })}
           >
-            <RendererLifecycle onDeviceLost={remountCanvas} />
+            <RendererLifecycle onDeviceLost={remountCanvas} onActive={setActiveRenderer} />
             <color attach="background" args={[bg]} />
             {!isParasite && <fog attach="fog" args={[bg, 12, 35]} />}
 
@@ -221,6 +227,7 @@ function App() {
           ) : (
             <>
               <WeatherPanel />
+              <RendererPanel />
               {scale === 'cellular' && <TissuePanel />}
               {scale === 'roots' && <SoilPanel overlay={soilOverlay} onOverlay={setSoilOverlay} />}
             </>
