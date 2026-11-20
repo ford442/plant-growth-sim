@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { downloadPlantGLB } from './plantExport'
 import { useSimStore } from '../stores/simStore'
 import { useTimeStore } from '../stores/timeStore'
 import { useModeStore } from '../stores/modeStore'
@@ -22,6 +23,21 @@ export function SimControls() {
   const height = useSimStore((s) => s.height)
   const biomass = useSimStore((s) => s.biomass)
   const growthRate = useSimStore((s) => s.growthRate)
+  const species = useSimStore((s) => s.species)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const exportGLB = async () => {
+    setExporting(true)
+    setExportError(null)
+    try {
+      await downloadPlantGLB(`plant-${species}-day${Math.floor(age)}.glb`)
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="panel sim-controls">
@@ -42,7 +58,18 @@ export function SimControls() {
             🎲 Reseed
           </button>
         )}
+        {mode === 'plant' && (
+          <button
+            className="btn"
+            onClick={exportGLB}
+            disabled={exporting}
+            title="Download the current plant scene as a .glb (static snapshot, no animation)"
+          >
+            ⭳ Export GLB
+          </button>
+        )}
       </div>
+      {exportError && <div className="stat-label">Export failed: {exportError}</div>}
 
       <div className="control">
         <label>

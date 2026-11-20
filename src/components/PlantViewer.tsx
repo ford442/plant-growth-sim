@@ -8,6 +8,7 @@ import {
   interpretLSystem,
 } from '../simulation/LSystem'
 import type { ViewScale } from '../App'
+import { registerPlantRoot } from './plantExport'
 
 interface Props {
   scale: ViewScale
@@ -213,12 +214,13 @@ function MacroView() {
 
 // The simulation tick lives in <SimClock /> (shared with the gem viewer).
 export function PlantViewer({ scale }: Props) {
+  // Root group is registered so the UI can export the on-screen scene as GLB.
   return (
-    <>
+    <group ref={registerPlantRoot} name="plant-scene">
       {scale === 'macro' && <MacroView />}
       {scale === 'architecture' && <ArchitectureView />}
       {scale === 'cellular' && <CellularView />}
       {scale === 'roots' && <RootsView />}
-    </>
+    </group>
   )
 }
