@@ -19,6 +19,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/stores/simStore.ts` — single source of truth for time, weather, plant status, gem state (`mode`, `gemstone`, `geology`, `crystal`)
 - `src/stores/modeStore.ts` — `mode: 'plant' | 'gem' | 'parasite'`; `src/stores/timeStore.ts` — shared play/pause + speed (one clock for all modes)
 - `src/rendering/` — renderer bootstrap (`rendererFactory`: WebGL for GLSL modes, WebGPU→WebGL2 fallback on request), capability probe, GPU-loss handling, `RendererLifecycle` (disposes renderer/device on Canvas unmount)
+- `src/components/plantExport.ts` — GLB export of the on-screen plant scene (`registerPlantRoot` from PlantViewer; button in SimControls). v0: static snapshot, no animation tracks, branches as LINES until tube branches land, leaves via EXT_mesh_gpu_instancing, plain PBR colours
 - `src/components/SimClock.tsx` — the one `useFrame` that calls `tick(dt)`; plant and gem sims share this clock
 - `src/simulation/LSystem.ts` — rules + turtle interpreter per species
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`
@@ -71,7 +72,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 4. Real cellular cross-section with animated division
 5. Soil moisture field + animated water particles into roots
 6. WebGPU / TSL upgrade path
-7. Export current plant as GLB
+7. ~~Export current plant as GLB~~ (v0 done; revisit after tube branches)
 
 ## Running Locally
 ```bash
