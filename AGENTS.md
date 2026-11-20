@@ -21,7 +21,9 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/rendering/` — renderer bootstrap (`rendererFactory`: WebGL for GLSL modes, WebGPU→WebGL2 fallback on request), capability probe, GPU-loss handling, `RendererLifecycle` (disposes renderer/device on Canvas unmount)
 - `src/components/plantExport.ts` — GLB export of the on-screen plant scene (`registerPlantRoot` from PlantViewer; button in SimControls). v0: static snapshot, no animation tracks, branches as LINES until tube branches land, leaves via EXT_mesh_gpu_instancing, plain PBR colours
 - `src/components/SimClock.tsx` — the one `useFrame` that calls `tick(dt)`; plant and gem sims share this clock
-- `src/simulation/LSystem.ts` — rules + turtle interpreter per species
+- `src/simulation/LSystem.ts` — rules + turtle interpreter per species (deterministic: leaf sizes come from `hash01`, never `Math.random`; segments/leaves carry the `src` symbol index that produced them)
+- `src/simulation/LSystemMorph.ts` — pure smooth growth between L-system iterations: lineage through the rewrite, `createMorphBuilder().morph(n)` → `from`/`to` typed arrays, `sampleSegments` / `sampleLeaves` at any `t`, plus `advanceDevelopment` (the weather-driven development clock) and `morphFactor`
+- `src/components/plant/` — viewer side of the morph: `MorphedPlant.ts` (dynamic branch geometry + leaf instance buffer, re-posed in place, one shared instance per species+stage via `getMorphedPlant`) and `leafMatrix.ts` (hand-expanded `lookAt` + `rotateX(π/2)`, pinned to three.js by a test)
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`
 - `src/components/WeatherPanel.tsx` + `SimControls.tsx` — UI
 
@@ -73,7 +75,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 ## Next High-Value Tasks
 1. Replace lineSegments with proper tube / instanced cylinder branches
 2. Better leaf meshes (or simple instanced planes with better orientation)
-3. Smooth growth interpolation (lerp between L-system generations)
+3. ~~Smooth growth interpolation (lerp between L-system generations)~~ (done: `LSystemMorph.ts`; the sim exposes a continuous `lsystemProgress`, the view blends generation `floor(progress)` into the next by its fractional part)
 4. ~~Real cellular cross-section with animated division~~ (done, #13: `TissueGrowth.ts` + cellular view; next: stomata / leaf tissue, anticlinal divisions to widen the cambium)
 5. Soil moisture field + animated water particles into roots
 6. WebGPU / TSL upgrade path
@@ -96,6 +98,10 @@ npm test
 
 ## Notes for Agents
 - Do not break the Zustand tick loop
+- Architecture development is `simStore.lsystemProgress` (continuous; `lsystemIterations` is its integer part). It advances by `days × rate / DAYS_PER_ITERATION`, where `rate` is the same weather-driven factor that scales biomass and height, so branching slows, stalls and pauses with growth. Do not drive it from `age` again — that desyncs architecture from the weather
+- The L-system morph is pure and unit-tested (`LSystemMorph.test.ts`, `leafMatrix.test.ts`, `simStore.test.ts`) — run `npm test` after touching `LSystem.ts` or the morph. Interpolation lives in the viewer layer (`useFrame` samples the morph from `useSimStore.getState().lsystemProgress`); the sim never sees the interpolation factor
+- Morph assumptions: every drawing symbol (`F`/`G`) rewrites to at least one drawing symbol (otherwise the removed segment pops out at the start of the morph). Depth-0 draws in a replacement are the trunk and tile their parent; draws inside brackets are side branches that peel off it; draws from a bud (`X`, `A`) grow collapsed out of the bud
+- Known issue (pre-existing, not fixed by the morph): the turtle starts with pitch π/2, where yaw (`+`/`-`) has no sideways effect, and every shipped species only uses `+`/`-`, so all presets currently grow as a straight vertical line. The morph tests also run on rule sets that tilt with `&`/`^` so they exercise real 3D branching
 - The parasite sim is pure and unit-tested — run `npm test` after touching `src/simulation/parasite/`
 - Parasite time is two gears (action seconds vs lesion hours); never collapse them into one clock without reading `docs/design/parasite-mode.md` §3
 - When adding a parasite stage, extend `LifeStage` + `STAGE_DEFS` and add its transitions to `LIFE_CYCLE`

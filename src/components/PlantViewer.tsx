@@ -1,79 +1,37 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useSimStore } from '../stores/simStore'
-import {
-  SPECIES_LSYSTEMS,
-  generateLSystem,
-  interpretLSystem,
-} from '../simulation/LSystem'
+import { SPECIES_LSYSTEMS } from '../simulation/LSystem'
+import { morphFactor } from '../simulation/LSystemMorph'
 import type { ViewScale } from '../App'
 import { registerPlantRoot } from './plantExport'
 import { CellularView } from './CellularView'
+import { getMorphedPlant, type MorphedPlant } from './plant/MorphedPlant'
 
 interface Props {
   scale: ViewScale
 }
 
-function BranchSegments({
-  segments,
-  color,
-}: {
-  segments: ReturnType<typeof interpretLSystem>['segments']
-  color: string
-}) {
-  const geo = useMemo(() => {
-    const positions: number[] = []
-    const radii: number[] = []
-
-    for (const seg of segments) {
-      positions.push(...seg.start, ...seg.end)
-      radii.push(seg.thickness, seg.thickness * 0.85)
-    }
-
-    // simple line segments for now; later upgrade to tubeGeometry or instanced cylinders
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    return g
-  }, [segments])
-
+// Both layers are re-posed in place every frame by <ArchitectureView/> (see
+// MorphedPlant), so they are culled by nothing: their bounds are changing.
+function BranchSegments({ plant, color }: { plant: MorphedPlant; color: string }) {
+  // simple line segments for now; later upgrade to tubeGeometry or instanced cylinders
   return (
-    <lineSegments geometry={geo}>
+    <lineSegments geometry={plant.branchGeometry} frustumCulled={false}>
       <lineBasicMaterial color={color} linewidth={2} />
     </lineSegments>
   )
 }
 
-function Leaves({
-  leaves,
-  color,
-}: {
-  leaves: ReturnType<typeof interpretLSystem>['leaves']
-  color: string
-}) {
-  const meshRef = useRef<THREE.InstancedMesh>(null)
-
-  useEffect(() => {
-    if (!meshRef.current) return
-    const dummy = new THREE.Object3D()
-    leaves.forEach((leaf, i) => {
-      dummy.position.set(...leaf.position)
-      // orient roughly toward direction
-      dummy.lookAt(
-        leaf.position[0] + leaf.direction[0],
-        leaf.position[1] + leaf.direction[1],
-        leaf.position[2] + leaf.direction[2]
-      )
-      dummy.rotateX(Math.PI / 2)
-      dummy.scale.setScalar(leaf.size)
-      dummy.updateMatrix()
-      meshRef.current!.setMatrixAt(i, dummy.matrix)
-    })
-    meshRef.current.instanceMatrix.needsUpdate = true
-  }, [leaves])
-
+function Leaves({ plant, color }: { plant: MorphedPlant; color: string }) {
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, leaves.length]}>
+    <instancedMesh
+      key={plant.key}
+      args={[undefined, undefined, plant.leafCount]}
+      frustumCulled={false}
+    >
+      <primitive object={plant.leafMatrices} attach="instanceMatrix" />
       <planeGeometry args={[1, 1.4]} />
       <meshStandardMaterial
         color={color}
@@ -87,22 +45,33 @@ function Leaves({
 
 function ArchitectureView() {
   const species = useSimStore((s) => s.species)
-  const iterations = useSimStore((s) => s.lsystemIterations)
+  // whole iteration only: React re-renders when the stage steps, not per tick
+  const stage = useSimStore((s) => s.lsystemIterations)
   const height = useSimStore((s) => s.height)
   const waterStatus = useSimStore((s) => s.waterStatus)
 
   const def = SPECIES_LSYSTEMS[species] ?? SPECIES_LSYSTEMS.sunflower
 
-  const { segments, leaves } = useMemo(() => {
-    const str = generateLSystem(def.axiom, def.rules, iterations)
-    return interpretLSystem(str, def)
-  }, [species, iterations, def])
+  // The expensive part — L-system strings, lineage, geometry — runs once per
+  // iteration step and is shared by every plant on screen. Growth *between*
+  // steps is a cheap re-pose of that geometry in useFrame below.
+  const plant = useMemo(() => {
+    const p = getMorphedPlant(species, stage)
+    p.setMorph(morphFactor(useSimStore.getState().lsystemProgress, p.stage))
+    return p
+  }, [species, stage])
 
   // gentle sway from wind
   const group = useRef<THREE.Group>(null)
   const wind = useSimStore((s) => s.weather.wind)
 
   useFrame((state) => {
+    // Growth is read from the sim every frame, so it follows play/pause, speed
+    // and the weather-driven growth rate exactly. Clamped: if the sim stepped to
+    // the next iteration a frame before React re-rendered, this still shows the
+    // end of the morph it holds rather than jumping back.
+    plant.setMorph(morphFactor(useSimStore.getState().lsystemProgress, plant.stage))
+
     if (!group.current) return
     const t = state.clock.elapsedTime
     const sway = Math.sin(t * 1.2) * 0.015 * Math.min(wind, 8)
@@ -120,8 +89,8 @@ function ArchitectureView() {
 
   return (
     <group ref={group} scale={[scale, scale, scale]} position={[0, 0, 0]}>
-      <BranchSegments segments={segments} color={stemColor} />
-      <Leaves leaves={leaves} color={leafColor} />
+      <BranchSegments plant={plant} color={stemColor} />
+      <Leaves plant={plant} color={leafColor} />
       {/* ground disk */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
         <circleGeometry args={[3.5, 48]} />

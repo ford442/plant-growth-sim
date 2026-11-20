@@ -41,7 +41,7 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 ### Backlog (high value from AGENTS.md)
 - [ ] [#17](https://github.com/ford442/plant-growth-sim/issues/17) Replace lineSegments with tube / instanced cylinder branches  
 - [ ] [#18](https://github.com/ford442/plant-growth-sim/issues/18) Better leaf meshes (instanced planes, orientation)  
-- [ ] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations)  
+- [x] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations) — `LSystemMorph.ts` (lineage through the rewrite; trunk stretches, side branches peel off, buds grow out of their parent, new leaves fade in) driven by the weather-coupled `lsystemProgress`  
 - [x] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division — `TissueGrowth.ts` (cambium / xylem / phloem files, growth rings, drought slows division and enlargement) + cellular view with stem disc and cell lens  
 - [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots  
 - [ ] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path  
