@@ -83,6 +83,13 @@ export interface LSystemMorph {
   /** Start and end (x, y, z, x, y, z) of each segment at t = 0 and t = 1. */
   segmentsFrom: Float32Array
   segmentsTo: Float32Array
+  /**
+   * Interpreter `thickness` of each segment at t = 0 and t = 1. Trunk links keep
+   * their parent's thickness; a side branch or bud-grown segment starts at 0 and
+   * thickens as it extends, so a new twig never pops in at full width.
+   */
+  thicknessFrom: Float32Array
+  thicknessTo: Float32Array
   leafCount: number
   /** position (3), unit direction (3), size per leaf at t = 0 and t = 1. */
   leavesFrom: Float32Array
@@ -96,6 +103,7 @@ interface Generation {
   str: string
   segPos: Float32Array
   segSrc: Int32Array
+  segThick: Float32Array
   leafData: Float32Array
   leafSrc: Int32Array
   charPos: Float32Array
@@ -112,11 +120,13 @@ function buildGeneration(str: string, def: LSystemDef): Generation {
 
   const segPos = new Float32Array(segments.length * 6)
   const segSrc = new Int32Array(segments.length)
+  const segThick = new Float32Array(segments.length)
   const segAt = new Int32Array(str.length).fill(-1)
   segments.forEach((s, i) => {
     segPos.set(s.start, i * 6)
     segPos.set(s.end, i * 6 + 3)
     segSrc[i] = s.src
+    segThick[i] = s.thickness
     segAt[s.src] = i
   })
 
@@ -131,7 +141,7 @@ function buildGeneration(str: string, def: LSystemDef): Generation {
     if (l.src >= 0) leafAt[l.src] = i
   })
 
-  return { str, segPos, segSrc, leafData, leafSrc, charPos, segAt, leafAt }
+  return { str, segPos, segSrc, segThick, leafData, leafSrc, charPos, segAt, leafAt }
 }
 
 /**
@@ -211,6 +221,7 @@ function morphBetween(
   // --- segments -----------------------------------------------------------
   const segCount = b.segSrc.length
   const segFrom = new Float32Array(segCount * 6)
+  const thickFrom = new Float32Array(segCount) // 0 unless the segment tiles an existing one
   let lastParent = -1
   let slot = 0
   for (let j = 0; j < segCount; j++) {
@@ -237,6 +248,7 @@ function morphBetween(
         segFrom[o + c] = s + d * t0
         segFrom[o + 3 + c] = s + d * t1
       }
+      if (link.onTrunk) thickFrom[j] = a.segThick[pj]
     } else {
       // grown from a bud: collapsed onto the bud's position
       for (let c = 0; c < 3; c++) {
@@ -292,6 +304,8 @@ function morphBetween(
     segmentCount: segCount,
     segmentsFrom: segFrom,
     segmentsTo: b.segPos,
+    thicknessFrom: thickFrom,
+    thicknessTo: b.segThick,
     leafCount,
     leavesFrom,
     leavesTo: b.leafData,
@@ -306,6 +320,8 @@ function staticMorph(iterations: number, g: Generation): LSystemMorph {
     segmentCount: g.segSrc.length,
     segmentsFrom: g.segPos,
     segmentsTo: g.segPos,
+    thicknessFrom: g.segThick,
+    thicknessTo: g.segThick,
     leafCount: g.leafSrc.length,
     leavesFrom: g.leafData,
     leavesTo: g.leafData,
@@ -361,6 +377,18 @@ const smoothstep = (e0: number, e1: number, x: number) => {
 export function sampleSegments(m: LSystemMorph, t: number, out: Float32Array): void {
   const a = m.segmentsFrom
   const b = m.segmentsTo
+  if (m.isStatic) {
+    out.set(b)
+    return
+  }
+  const k = Math.min(1, Math.max(0, t))
+  for (let i = 0; i < b.length; i++) out[i] = a[i] + (b[i] - a[i]) * k
+}
+
+/** Write the segment thickness at `t` into `out` (one float per segment). */
+export function sampleThickness(m: LSystemMorph, t: number, out: Float32Array): void {
+  const a = m.thicknessFrom
+  const b = m.thicknessTo
   if (m.isStatic) {
     out.set(b)
     return

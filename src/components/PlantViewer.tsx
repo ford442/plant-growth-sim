@@ -28,12 +28,19 @@ export const PLANT_VIEW_TARGET: Record<ViewScale, [number, number, number]> = {
 
 // Both layers are re-posed in place every frame by <ArchitectureView/> (see
 // MorphedPlant), so they are culled by nothing: their bounds are changing.
-function BranchSegments({ plant, color }: { plant: MorphedPlant; color: string }) {
-  // simple line segments for now; later upgrade to tubeGeometry or instanced cylinders
+function Branches({ plant, color }: { plant: MorphedPlant; color: string }) {
+  // One instanced cylinder per L-system segment (see plant/branchMatrix.ts).
   return (
-    <lineSegments geometry={plant.branchGeometry} frustumCulled={false}>
-      <lineBasicMaterial color={color} linewidth={2} />
-    </lineSegments>
+    <instancedMesh
+      key={plant.key}
+      args={[undefined, undefined, plant.segmentCount]}
+      frustumCulled={false}
+    >
+      <primitive object={plant.branchMatrices} attach="instanceMatrix" />
+      {/* shared between plants, so a primitive: R3F must not dispose it on unmount */}
+      <primitive object={plant.branchGeometry} attach="geometry" />
+      <meshStandardMaterial color={color} roughness={0.9} metalness={0} />
+    </instancedMesh>
   )
 }
 
@@ -119,7 +126,7 @@ function ArchitectureView({ ground = true }: { ground?: boolean }) {
 
   return (
     <group ref={group} scale={[scale, scale, scale]} position={[0, 0, 0]}>
-      <BranchSegments plant={plant} color={stemColor} />
+      <Branches plant={plant} color={stemColor} />
       <Leaves plant={plant} color={leafColor} nodeMaterial={nodeLeaf?.material ?? null} />
       {/* ground disk (left out over the soil slice, which it would hide) */}
       {ground && (
