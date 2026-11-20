@@ -43,7 +43,7 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - [ ] [#18](https://github.com/ford442/plant-growth-sim/issues/18) Better leaf meshes (instanced planes, orientation)  
 - [x] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations) — `LSystemMorph.ts` (lineage through the rewrite; trunk stretches, side branches peel off, buds grow out of their parent, new leaves fade in) driven by the weather-coupled `lsystemProgress`  
 - [x] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division — `TissueGrowth.ts` (cambium / xylem / phloem files, growth rings, drought slows division and enlargement) + cellular view with stem disc and cell lens  
-- [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots  
+- [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots — moisture field done with #12 Phase 4 (`SoilField.ts`, Roots view); water particles still open  
 - [ ] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path  
 - [ ] [#16](https://github.com/ford442/plant-growth-sim/issues/16) Export plant as GLB  
 
@@ -51,14 +51,14 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - [x] Vite + React + TS + R3F scaffold  
 - [x] Working L-system + species presets  
 - [x] Weather panel + sim controls  
-- [x] Multi-view scale tabs (roots is still a stub; cellular is real as of #13)  
+- [x] Multi-view scale tabs (all four real: cellular as of #13, roots as of #12 Phase 4)  
 
 ---
 
 ## Track B — Gemstone growth ([#1](https://github.com/ford442/plant-growth-sim/issues/1))
 
 ### Status
-**Gem mode in code (2026-11-19).** Phase 1 (#11) done; crystal-system habits from #15 and the lattice view + defects / layer growth from #12 Phase 3 done. Open: TSL optical materials (#15, waits on #19), mineral–root co-evolution (#12 Phase 4).
+**Gem mode in code (2026-11-19).** Phase 1 (#11) done; crystal-system habits from #15 and the lattice view + defects / layer growth from #12 Phase 3 done. Phase 4 (#12) done: soil mineral field under the plant, mineral–root interactions (water uptake, calcium nutrition, hardpans) and root-channel geodes / rhizoliths, demoable in the plant Roots view. Open: TSL optical materials (#15, waits on #19).
 
 ### Plan summary (mirror of #1)
 - Phase 1: [#11](https://github.com/ford442/plant-growth-sim/issues/11) `CrystalGrowth.ts`, `GemstoneId` + `GEMSTONE_PRESETS`, env fields, prism/octahedra instances  
@@ -170,10 +170,11 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 - [ ] Felid gut deserves its own view scale (enterocytes + endopolygeny), currently reuses the tissue scene
 - [ ] Congenital / vertical transmission route (research §1, path 4)
 - [ ] TSL materials for the pellicle and cyst wall once the WebGPU path lands (#19)
-- [ ] Soil mineral field shared with gem mode (#12 Phase 4) — oocysts and geodes in one substrate
+- [ ] Share the soil mineral field (#12 Phase 4, `SoilField.ts`) with the oocyst field — oocysts and geodes in one substrate
 
 ## Last updated
 
+- **2026-11-20** — Gem #12 Phase 4 landed: `src/simulation/SoilField.ts` (soil water + silica/calcite field, roots, cement, nodules) drives plant water status and calcium nutrition; the Roots tab is a real soil slice (`soil/SoilView`, `SoilPanel`) with geodes that open in gem mode.
 - **2026-11-20** — Plant #13 landed: the Cellular tab is a real stem cross-section (`src/simulation/TissueGrowth.ts`, `CellularView`, `TissuePanel`) with animated mitosis / expansion, growth rings and weather-driven division. Gem and parasite modes untouched.
 - **2026-11-19** — Track C landed end to end: C0 design lock (`docs/design/parasite-mode.md`), C1–C5 implemented in `src/simulation/parasite/` + `parasiteStore` + `ParasiteViewer`, 51 unit tests. Plant and gem modes untouched.
 

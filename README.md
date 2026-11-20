@@ -28,7 +28,7 @@ A beautiful, educational, and scientifically grounded web app that lets you:
 1. **Macro** – full plant or small garden with weather effects
 2. **Architecture** – L-system / space-colonization branching with growth animation
 3. **Tissue / Cellular** – a stem cross-section showing cambium, xylem/phloem and growth rings, with the cells dividing, enlarging and hardening (see [Cellular view](#cellular-view)); stomata still to come
-4. **Root Zone** – 3D soil volume, root hairs, water potential gradients, nutrient uptake
+4. **Roots** – a soil slice under the plant: water, dissolved minerals, cement and nodules, with the root system drawing on it (see [Roots view](#roots-view)); root hairs still to come
 
 ### Plant Species (initial targets)
 | Species | Type | Growth model focus |
@@ -63,6 +63,25 @@ Weather drives it through the same inputs as the rest of the plant:
 - Wall hardening only needs warmth, so drought-stunted cells still harden: narrow, dense wood.
 
 The status strip under the viewport says in a sentence what the cambium is doing and why, with live meters for division, enlargement and the cell-cycle mix. The sidebar panel has the ring counts and a legend. Bamboo and fern are shown with the same model for comparison, but note that monocots and ferns have no vascular cambium (the panel says so).
+
+## Roots view
+
+The **🌱 Roots** tab is a vertical soil slice under the plant (4.8 m × 2.4 m, 24 × 16 cells) that the plant actually lives on: rain reaches the plant only through it.
+
+| Process | What happens |
+|---|---|
+| **Water** | Rain infiltrates the top, water above field capacity drains down (leaching solutes out of the bottom), capillary flow evens it out and lifts it to a drying surface, the surface evaporates, and roots take up water to meet transpiration demand. The plant's **water status** follows uptake ÷ demand. |
+| **Minerals** | Pore water carries dissolved **silica** (solubility rises with temperature) and **calcium carbonate** (solubility falls with temperature and rises with soil CO₂). Undersaturated water dissolves the parent material and earlier cement; a large exchangeable-calcium pool on clay buffers it. |
+| **Mineral–root interactions** | Roots take water but leave most solutes behind, so a drying root zone concentrates minerals. Root exudates speed silicate weathering; root respiration raises soil CO₂, which holds calcite in solution until the plant slows and the CO₂ falls. Calcium leached below the roots by heavy rain leaves the plant short of **calcium nutrition**, which slows growth. |
+| **Precipitation** | Supersaturated water (S > 1) cements pores (less water storage; over 50 % is a **hardpan** that stops roots that have not crossed it yet) and nucleates nodules with the classical J ∝ exp(−B / ln²S) law used for crystals, several times likelier on roots. Nodules grow with the same BCF law as gem crystals. |
+
+Three soils to try (sidebar → **Soil & minerals**):
+
+- **Meadow loam** — the control: buffered, fertile, minerals stay dissolved for weeks.
+- **Volcanic ash** — stop the rain and let the plant dry the soil: chert nodules nucleate around the roots, the biggest become **root-channel geodes**, and the surface crusts into silcrete. Heavy rain leaches the scarce calcium. **Grow its quartz lining in Gem mode →** opens the amethyst geode crystal sim.
+- **Limestone rendzina** — alternate rain and dry spells: calcite precipitates on the roots as **rhizoliths** and builds a calcic horizon at the base of the root zone.
+
+Overlays colour the slice by water, silica or calcite saturation, cement or root density. Mineral time is compressed like the gem sim's (real calcretes and geodes take centuries).
 
 ## Gem mode
 
@@ -171,14 +190,15 @@ npm run dev
 
 ### Phase 1 – Core Simulation
 - [ ] Functional-structural growth (biomass allocation)
-- [ ] Root architecture + water potential model
+- [x] Root architecture + soil water / mineral field (Roots view)
 - [ ] Animated water flow in vasculature
 - [ ] Species presets with different L-rules + parameters
 
 ### Phase 2 – Multi-scale
 - [ ] Seamless zoom / scale switcher
 - [x] Cellular cross-section with mitosis / expansion animation
-- [ ] Soil moisture visualization + root hair detail
+- [x] Soil moisture visualization
+- [ ] Root hair detail
 
 ### Phase 3 – Polish & Export
 - [ ] Beautiful TSL shaders (translucency, chlorophyll, rain droplets, etc.)

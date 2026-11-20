@@ -990,3 +990,40 @@
   user-select: none;
 }
 .tissue-label-dim { color: #8fb08f; font-weight: 500; font-size: 10px; }
+
+/* ------------------------------------------------------------------------ */
+/* Roots view: soil & minerals panel + scene labels                         */
+/* ------------------------------------------------------------------------ */
+.soil-panel { display: flex; flex-direction: column; gap: 0.6rem; }
+.soil-panel h3 { margin-bottom: 0.1rem; }
+.soil-profiles, .soil-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.soil-chip {
+  background: #0f1a10;
+  border: 1px solid #22362a;
+  color: #9cc59c;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.soil-chip:hover { border-color: #3b5c40; color: #d4ecd4; }
+.soil-chip.active { background: #1b3320; border-color: #4ade80; color: #e6f7e6; }
+.soil-chip.small { padding: 0.2rem 0.45rem; font-size: 0.64rem; }
+.soil-status { align-items: flex-start; }
+.soil-overlay { display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.5rem; border-top: 1px solid #1a2a1a; }
+.soil-ramp { height: 10px; border-radius: 4px; border: 1px solid #22362a; }
+.soil-ramp-ticks { display: flex; justify-content: space-between; font-size: 0.6rem; color: #6f9a6f; }
+.soil-geode-btn { width: 100%; }
+.soil-geode-btn:disabled { opacity: 0.5; cursor: default; }
+.soil-tick { font-size: 10px; color: #8a7a62; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.soil-callout {
+  font-size: 10px;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(10, 8, 6, 0.75);
+  border: 1px solid currentColor;
+}
+.soil-callout.hardpan { color: #e9dfc9; }
+.soil-callout.geode { color: #c9b6ff; }
