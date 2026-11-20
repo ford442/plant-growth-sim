@@ -400,20 +400,24 @@ export function CellLens() {
         <planeGeometry args={[LENS_LEFT + LENS_RIGHT, LENS_HEIGHT]} />
         <meshBasicMaterial color={COLOR.background} toneMapped={false} />
       </mesh>
-      <lineLoop position={[0, 0, -0.02]}>
+      {/* four edges as segments, not a LineLoop: WebGPURenderer does not draw LineLoop */}
+      <lineSegments position={[0, 0, -0.02]}>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
             args={[
               new Float32Array([
-                -LENS_LEFT, -top, 0, LENS_RIGHT, -top, 0, LENS_RIGHT, top, 0, -LENS_LEFT, top, 0,
+                -LENS_LEFT, -top, 0, LENS_RIGHT, -top, 0,
+                LENS_RIGHT, -top, 0, LENS_RIGHT, top, 0,
+                LENS_RIGHT, top, 0, -LENS_LEFT, top, 0,
+                -LENS_LEFT, top, 0, -LENS_LEFT, -top, 0,
               ]),
               3,
             ]}
           />
         </bufferGeometry>
         <lineBasicMaterial color="#3f6f46" toneMapped={false} />
-      </lineLoop>
+      </lineSegments>
 
       {/* cambium column glow: brighter the faster the cambium is cycling */}
       <mesh position={[0, 0, -0.015]}>

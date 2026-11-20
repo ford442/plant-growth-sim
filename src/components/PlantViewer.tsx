@@ -8,6 +8,7 @@ import type { ViewScale } from '../App'
 import { registerPlantRoot } from './plantExport'
 import { CellularView } from './CellularView'
 import { getMorphedPlant, type MorphedPlant } from './plant/MorphedPlant'
+import { useLeafNodeMaterial } from './plant/useLeafNodeMaterial'
 import { SoilView } from './soil/SoilView'
 import type { SoilOverlay } from './soil/palette'
 
@@ -36,7 +37,15 @@ function BranchSegments({ plant, color }: { plant: MorphedPlant; color: string }
   )
 }
 
-function Leaves({ plant, color }: { plant: MorphedPlant; color: string }) {
+interface LeavesProps {
+  plant: MorphedPlant
+  /** Colour for the standard material (already tinted for water stress). */
+  color: string
+  /** The TSL node material when the renderer supports it and it has loaded; otherwise null. */
+  nodeMaterial: THREE.Material | null
+}
+
+function Leaves({ plant, color, nodeMaterial }: LeavesProps) {
   return (
     <instancedMesh
       key={plant.key}
@@ -45,12 +54,17 @@ function Leaves({ plant, color }: { plant: MorphedPlant; color: string }) {
     >
       <primitive object={plant.leafMatrices} attach="instanceMatrix" />
       <planeGeometry args={[1, 1.4]} />
-      <meshStandardMaterial
-        color={color}
-        side={THREE.DoubleSide}
-        roughness={0.7}
-        metalness={0.05}
-      />
+      {nodeMaterial ? (
+        // owned (and disposed) by useLeafNodeMaterial, which outlives this re-keyed mesh
+        <primitive object={nodeMaterial} attach="material" />
+      ) : (
+        <meshStandardMaterial
+          color={color}
+          side={THREE.DoubleSide}
+          roughness={0.7}
+          metalness={0.05}
+        />
+      )}
     </instancedMesh>
   )
 }
@@ -95,14 +109,18 @@ function ArchitectureView({ ground = true }: { ground?: boolean }) {
   const scale = Math.max(0.3, height / 1.8)
 
   // slight color shift when water stressed
+  const healthyLeaf = def.leafColor ?? '#3d8b3d'
   const stemColor = waterStatus < 0.35 ? '#6b4a2a' : def.color
-  const leafColor =
-    waterStatus < 0.35 ? '#8a7a3a' : (def.leafColor ?? '#3d8b3d')
+  const leafColor = waterStatus < 0.35 ? '#8a7a3a' : healthyLeaf
+
+  // TSL leaf (WebGPURenderer only, see docs/design/webgpu-tsl.md). It does its own
+  // water-stress tint continuously, so it takes the species colour, not `leafColor`.
+  const nodeLeaf = useLeafNodeMaterial(healthyLeaf)
 
   return (
     <group ref={group} scale={[scale, scale, scale]} position={[0, 0, 0]}>
       <BranchSegments plant={plant} color={stemColor} />
-      <Leaves plant={plant} color={leafColor} />
+      <Leaves plant={plant} color={leafColor} nodeMaterial={nodeLeaf?.material ?? null} />
       {/* ground disk (left out over the soil slice, which it would hide) */}
       {ground && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
