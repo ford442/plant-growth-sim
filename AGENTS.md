@@ -35,7 +35,8 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 
 ### Roots view + soil mineral field (gem epic #1, issue #12 Phase 4)
 - `src/simulation/SoilField.ts` — pure model: `SoilState` = a 24 × 16 vertical soil slice (water, dissolved silica / calcium carbonate, exchangeable Ca, silica / calcite cement, root density, per-column root front and reach, nodules), `stepSoil()` (infiltration, drainage + leaching, capillary flow, evaporation, root uptake, weathering, cementation, nodule nucleation / BCF growth, root front), `SOIL_PROFILES` (`SoilProfileId`: loam / volcanic / limestone), `SPECIES_ROOTS`, read-only helpers `soilMetrics` / `cellSaturation` / `largestGeode`. Reuses `growthLaw` + `rand` from `CrystalGrowth.ts`. `simStore.tick` steps it; its `supply` drives `waterStatus` and its `nutrient` drives `nutrientStatus`
-- `src/components/soil/SoilView.tsx` (slice tiles, roots clipped to `soil.rootFront`, nodules, labels), `soil/rootSkeleton.ts` (deterministic drawn root architecture), `soil/palette.ts` (overlay ramps shared with the legend)
+- `src/components/soil/SoilView.tsx` (slice tiles, roots clipped to `soil.rootFront`, nodules, labels), `soil/rootSkeleton.ts` (deterministic drawn root architecture; each segment has a `parent`, so any root can be followed back to the stem base. `poseRoots` / `RootPose` scale it to the current front and clip it at hardpans — the one pose the root lines and the water flow share), `soil/palette.ts` (overlay ramps shared with the legend)
+- **Water flow** (soil → root → stem; `SoilState.uptakeField` is the per-cell sink map the sim exposes): `soil/waterFlow.ts` is the pure, tested particle model (`WaterFlow`: parcels are emitted in proportion to `uptakeField`, drift to the nearest drawn root, follow the skeleton's parent chain to the stem base and rise up the stem; spawn rate ∝ total uptake, fixed visual speeds, so *density* is the flux; `step(0)` = paused), `soil/WaterFlowLayer.tsx` draws it as one instanced mesh (`userData.noExport`, so GLB export skips it), `soil/stemTop.ts` reads how high the drawn stem goes (`MorphedPlant.top`). The Roots panel has a "Show water flow" toggle and an **Uptake** overlay of `uptakeField`
 - `src/components/SoilPanel.tsx` — soil picker, overlays, meters; "Grow its quartz lining in Gem mode" switches to the amethyst geode
 
 ### Parasite mode (epic #3)
@@ -73,7 +74,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Scaffold complete
 - Working L-system that iterates with plant age
 - Weather affects growth rate + water status
-- 4 view modes (macro / architecture / cellular / roots); cellular is a real stem cross-section with animated mitosis, expansion and growth rings; roots is a soil slice with water, minerals, cement, nodules and the root system
+- 4 view modes (macro / architecture / cellular / roots); cellular is a real stem cross-section with animated mitosis, expansion and growth rings; roots is a soil slice with water, minerals, cement, nodules and the root system, plus animated water particles running soil → root → stem (density = uptake flux)
 - Soil mineral field (`SoilField.ts`, 3 soils) under the plant: rain reaches the plant only through it; minerals feed back via calcium nutrition and hardpans; geodes / rhizoliths form around roots
 - 6 species presets
 - Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls
@@ -84,7 +85,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 2. Better leaf meshes (or simple instanced planes with better orientation)
 3. ~~Smooth growth interpolation (lerp between L-system generations)~~ (done: `LSystemMorph.ts`; the sim exposes a continuous `lsystemProgress`, the view blends generation `floor(progress)` into the next by its fractional part)
 4. ~~Real cellular cross-section with animated division~~ (done, #13: `TissueGrowth.ts` + cellular view; next: stomata / leaf tissue, anticlinal divisions to widen the cambium)
-5. ~~Soil moisture field~~ (done with the soil mineral field, `SoilField.ts`) + animated water particles into roots
+5. ~~Soil moisture field~~ (done with the soil mineral field, `SoilField.ts`) + ~~animated water particles into roots~~ (done: `uptakeField` + `soil/waterFlow.ts`; next: show the rain itself falling and infiltrating, per-species flow tuning, leaf-side handoff — transpiration out of the stomata)
 6. ~~WebGPU / TSL upgrade path~~ (path documented and prototyped, #19: opt-in `?renderer=webgpu`, TSL leaf material; next: verify on a native WebGPU device, tune translucency/gloss, TSL stems once tube branches land, port gem/parasite modes — see `docs/design/webgpu-tsl.md` §8–9)
 7. ~~Export current plant as GLB~~ (v0 done; revisit after tube branches)
 
@@ -118,6 +119,8 @@ npm test
 - Growth rates are tuned to lab-synthesis scale (~0.1–1 mm/day) so they are watchable; stability fields are simplified curves
 - The soil sim is pure and unit-tested (`SoilField.test.ts`, plus coupling tests in `simStore.test.ts`) — run `npm test` after touching it. Plant water comes *only* through the soil now: `waterStatus` relaxes towards `soil.supply` (uptake ÷ transpiration demand), and growth rate is temp × light × water × `nutrientStatus`. Do not add a direct rain → waterStatus shortcut again
 - Soil units: `water` is a fraction of a cell's original pore space (≤ 1 − cement); solutes are stored as amounts (concentration × water) so drying concentrates them; saturation S = c / c_eq. A hardpan (cement ≥ `HARDPAN`) stops roots that have not reached it (`rootReach` per column) — one forming around established roots does not cut them off
+- `SoilState.uptakeField` is water drawn from each cell, mm/day over the cell's footprint; it sums to `uptake` × the canopy width in columns and is zero where there are no roots. Anything that animates uptake should read it rather than re-deriving a sink from root density. The water flow's visual speeds and spawn rate live in `FLOW` (`waterFlow.ts`); it is a view-layer model (no sim state, no clock of its own) — feed it the real frame `dt`, and `0` when the shared clock is paused
+- Overlays that animate or are snapshots (particles, labels that are DOM) must carry `userData.noExport = true` so `plantExport.ts` leaves them out of the GLB
 - TSL / node materials: load via dynamic `import()` only (a static `three/webgpu` or `three/tsl` import drags the whole WebGPU build into the default bundle), check `describeRenderer()` before using one, always keep a classic-material fallback, drive them with uniforms, and keep `color`/`roughness` mirrored on the material so GLB export still works. Before adding a mode to `NODE_READY_MODES`, walk every view with `?renderer=webgpu` and a console open (`THREE.LineLoop` is unsupported there — that is why the cellular frame is `lineSegments`). Full checklist: `docs/design/webgpu-tsl.md` §5, §8
 - Prefer small, focused PRs
 - Keep performance in mind (instancing, frustum culling later)

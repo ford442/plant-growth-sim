@@ -25,9 +25,21 @@ export function canExportPlant() {
 export async function exportPlantGLB(): Promise<ArrayBuffer> {
   if (!root) throw new Error('No plant scene is mounted')
   root.updateMatrixWorld(true)
-  const exporter = new GLTFExporter()
-  const result = await exporter.parseAsync(root, { binary: true, onlyVisible: true })
-  return result as ArrayBuffer
+  // animated overlays (the Roots view's water particles) are not part of the plant: hide them for the export
+  const hidden: THREE.Object3D[] = []
+  root.traverse((o) => {
+    if (o.userData.noExport && o.visible) {
+      o.visible = false
+      hidden.push(o)
+    }
+  })
+  try {
+    const exporter = new GLTFExporter()
+    const result = await exporter.parseAsync(root, { binary: true, onlyVisible: true })
+    return result as ArrayBuffer
+  } finally {
+    for (const o of hidden) o.visible = true
+  }
 }
 
 export async function downloadPlantGLB(filename: string) {

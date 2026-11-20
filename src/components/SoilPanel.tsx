@@ -93,9 +93,12 @@ function Meter({ label, value, hint }: { label: string; value: number; hint: str
 interface Props {
   overlay: SoilOverlay
   onOverlay: (o: SoilOverlay) => void
+  /** Animated water particles (soil → root → stem) on or off. */
+  flow: boolean
+  onFlow: (on: boolean) => void
 }
 
-export function SoilPanel({ overlay, onOverlay }: Props) {
+export function SoilPanel({ overlay, onOverlay, flow, onFlow }: Props) {
   const profileId = useSimStore((s) => s.soilProfile)
   const setProfile = useSimStore((s) => s.setSoilProfile)
   const species = useSimStore((s) => s.species)
@@ -194,6 +197,20 @@ export function SoilPanel({ overlay, onOverlay }: Props) {
           ))}
         </div>
         <p className="tissue-note">{ov.hint}</p>
+        <label className="soil-toggle">
+          <input type="checkbox" checked={flow} onChange={(e) => onFlow(e.target.checked)} />
+          <span>Show water flow</span>
+        </label>
+        {flow && (
+          <div className="tissue-legend-row">
+            <span className="swatch round soil-water-dot" />
+            <span>
+              <b>Water</b> — each dot is water a root is drawing right now: it leaves the soil where the uptake is, runs up the roots
+              (laterals merge into the main root) and rises up the stem to the canopy. A thicker stream means a higher flux — it thins
+              out as the soil dries, in the dark, or behind a hardpan.
+            </span>
+          </div>
+        )}
         <div className="tissue-legend-row">
           <span className="swatch round" style={{ background: MINERAL_HEX.silica }} />
           <span>

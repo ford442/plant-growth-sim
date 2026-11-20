@@ -192,6 +192,68 @@ describe('water', () => {
   })
 })
 
+describe('uptake sink field', () => {
+  const plant: SoilPlant = { species: 'sunflower', biomass: 2, growth: 0.6, activity: 0.8 }
+  const centroid = (s: SoilState) => {
+    let w = 0
+    let z = 0
+    for (let i = 0; i < SOIL_CELLS; i++) {
+      w += s.uptakeField[i]
+      z += s.uptakeField[i] * (Math.floor(i / SOIL_COLS) + 0.5) * CELL_H
+    }
+    return z / w
+  }
+
+  it('is a map of where the roots drew the uptake from: it adds up to the reported uptake', () => {
+    const { soil } = run('loam', 20, () => DRY)
+    expect(soil.uptakeField).toHaveLength(SOIL_CELLS)
+    const total = sum(soil.uptakeField)
+    expect(total).toBeGreaterThan(0)
+    // `uptake` is per m² under the canopy; the field is per cell, so it is that × the canopy width in columns
+    const canopyCols = total / soil.uptake
+    expect(canopyCols).toBeGreaterThanOrEqual(1)
+    expect(canopyCols).toBeLessThanOrEqual(SOIL_COLS)
+  })
+
+  it('sits in the root zone and nowhere else', () => {
+    const { soil } = run('loam', 25, () => DRY)
+    for (let i = 0; i < SOIL_CELLS; i++) {
+      expect(soil.uptakeField[i]).toBeGreaterThanOrEqual(0)
+      expect(Number.isFinite(soil.uptakeField[i])).toBe(true)
+      if (soil.roots[i] <= 0) expect(soil.uptakeField[i]).toBe(0)
+    }
+    // the taproot's column draws harder than a lateral one at the same depth
+    const stem = cellIndex(SOIL_COLS / 2, 1)
+    const edge = cellIndex(SOIL_COLS / 2 + 5, 1)
+    expect(soil.uptakeField[stem]).toBeGreaterThan(soil.uptakeField[edge])
+  })
+
+  it('follows the water: roots draw from deeper, wetter soil once the topsoil dries', () => {
+    const wet = createSoilState('loam', 'sunflower')
+    const advanced = stepSoil(wet, 'loam', DRY, { ...plant, growth: 1 }, 40) // grow roots first
+    const moist = stepSoil(advanced, 'loam', DRY, plant, 0.1)
+    const water = advanced.water.slice()
+    for (let row = 0; row < 5; row++) for (let col = 0; col < SOIL_COLS; col++) water[cellIndex(col, row)] = 0.12
+    const dried = stepSoil({ ...advanced, water }, 'loam', DRY, plant, 0.1)
+    expect(centroid(dried)).toBeGreaterThan(centroid(moist) + 0.1)
+    // and the cells that were dried out give up (almost) nothing
+    expect(sum(dried.uptakeField.slice(0, 5 * SOIL_COLS))).toBeLessThan(0.05 * sum(dried.uptakeField))
+  })
+
+  it('is zero when the plant is not transpiring', () => {
+    const s = stepSoil(createSoilState('loam', 'oak'), 'loam', { ...DRY, light: 0 }, { ...plant, species: 'oak' }, 1)
+    expect(sum(s.uptakeField)).toBe(0)
+  })
+
+  it('thins out in a drought: the same plant draws less from soil that cannot give it', () => {
+    const wet = run('loam', 60, () => RAIN).soil
+    const dry = run('loam', 60, () => DRY).soil
+    expect(wet.supply).toBe(1)
+    expect(dry.supply).toBeLessThan(wet.supply)
+    expect(sum(dry.uptakeField)).toBeLessThan(sum(wet.uptakeField))
+  })
+})
+
 describe('mineral–root interactions', () => {
   it('heavy rain leaches calcium from a poorly buffered ash soil: nutrition falls', () => {
     const { soil } = run('volcanic', 12, () => RAIN)
