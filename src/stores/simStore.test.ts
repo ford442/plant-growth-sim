@@ -102,3 +102,50 @@ describe('architecture development (L-system progress)', () => {
     expect(sim().lsystemIterations).toBe(5)
   })
 })
+
+describe('soil coupling', () => {
+  it('rain reaches the plant through the soil; a drought dries it out over weeks', () => {
+    // keep it raining for a few days: the plant stays turgid
+    for (let i = 0; i < 50; i++) sim().tick(0.1)
+    expect(sim().waterStatus).toBeGreaterThan(0.95)
+    // then stop the rain: the root zone dries and the plant's water status follows
+    sim().setWeather({ precipitation: 0, humidity: 0.4 })
+    useTimeStore.getState().setSpeed(3)
+    for (let i = 0; i < 400; i++) sim().tick(0.1) // 120 days
+    expect(sim().waterStatus).toBeLessThan(0.7)
+    expect(sim().soil.supply).toBeLessThan(0.7)
+    // rain again: the soil refills and the plant recovers within a few days
+    sim().setWeather({ precipitation: 8 })
+    for (let i = 0; i < 15; i++) sim().tick(0.1)
+    expect(sim().waterStatus).toBeGreaterThan(0.85)
+  })
+
+  it('calcium nutrition scales growth like water does', () => {
+    useSimStore.setState({ nutrientStatus: 0.5 })
+    sim().tick(0.1)
+    expect(sim().lsystemProgress).toBeCloseTo(MIN_ITERATIONS + (0.5 * 0.1) / DAYS_PER_ITERATION, 8)
+  })
+
+  it('switching the soil rebuilds the soil field; reset() rebuilds it too', () => {
+    for (let i = 0; i < 20; i++) sim().tick(0.1)
+    expect(sim().soil.t).toBeGreaterThan(1.9)
+    sim().setSoilProfile('volcanic')
+    expect(sim().soilProfile).toBe('volcanic')
+    expect(sim().soil.t).toBe(0)
+    for (let i = 0; i < 5; i++) sim().tick(0.1)
+    sim().reset()
+    expect(sim().soil.t).toBe(0)
+    expect(sim().soilProfile).toBe('volcanic')
+    expect(sim().nutrientStatus).toBe(1)
+    sim().setSoilProfile('loam')
+  })
+
+  it('the soil steps on the shared clock and pauses with it', () => {
+    useTimeStore.getState().pause()
+    sim().tick(0.1)
+    expect(sim().soil.t).toBe(0)
+    useTimeStore.getState().play()
+    sim().tick(0.1)
+    expect(sim().soil.t).toBeCloseTo(0.1, 10)
+  })
+})

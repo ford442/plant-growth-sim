@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, Stats } from '@react-three/drei'
-import { PlantViewer } from './components/PlantViewer'
+import { PlantViewer, PLANT_VIEW_TARGET } from './components/PlantViewer'
+import { SoilPanel } from './components/SoilPanel'
+import type { SoilOverlay } from './components/soil/palette'
 import { CrystalViewer, GemLightformers, GEM_VIEW_TARGET, type GemViewOptions, type GemViewScale } from './components/CrystalViewer'
 import { WeatherPanel } from './components/WeatherPanel'
 import { GeologyPanel } from './components/GeologyPanel'
@@ -33,6 +35,7 @@ import { useTimeStore } from './stores/timeStore'
 import { useParasiteStore } from './stores/parasiteStore'
 import { RendererLifecycle, rendererFactory, useGraphicsCapability } from './rendering'
 import { GEMSTONE_PRESETS } from './simulation/GemstonePresets'
+import { SOIL_PROFILES } from './simulation/SoilField'
 import { COMPARTMENT_LABEL } from './simulation/parasite/stages'
 import './App.css'
 
@@ -64,8 +67,10 @@ function App() {
   const [gemScale, setGemScale] = useState<GemViewScale>('crystal')
   const [parasiteScale, setParasiteScale] = useState<ParasiteViewScale>('tissue')
   const [gemOptions, setGemOptions] = useState<GemViewOptions>({ faceIndexing: false, phantoms: true })
+  const [soilOverlay, setSoilOverlay] = useState<SoilOverlay>('moisture')
   const mode = useModeStore((s) => s.mode)
   const species = useSimStore((s) => s.species)
+  const soilProfile = useSimStore((s) => s.soilProfile)
   const gemstone = useSimStore((s) => s.gemstone)
   const crystalStatus = useSimStore((s) => s.crystal.status)
   const isPlaying = useTimeStore((s) => s.isPlaying)
@@ -140,7 +145,7 @@ function App() {
             ) : isGem ? (
               <CrystalViewer scale={gemScale} options={gemOptions} />
             ) : (
-              <PlantViewer scale={scale} />
+              <PlantViewer scale={scale} soilOverlay={soilOverlay} />
             )}
 
             <OrbitControls
@@ -150,7 +155,7 @@ function App() {
                   ? PARASITE_VIEW_TARGET[parasiteScale]
                   : isGem
                     ? GEM_VIEW_TARGET[gemScale]
-                    : [0, 0, 0]
+                    : PLANT_VIEW_TARGET[scale]
               }
               minDistance={1.5}
               maxDistance={isParasite ? 45 : 30}
@@ -182,6 +187,12 @@ function App() {
                   <span className="label">View</span>
                   <span className="value">{isGem ? gemScale : scale}</span>
                 </div>
+                {!isGem && (
+                  <div className="hud-item">
+                    <span className="label">Soil</span>
+                    <span className="value">{SOIL_PROFILES[soilProfile].name}</span>
+                  </div>
+                )}
                 <div className="hud-item">
                   <span className="label">Sim</span>
                   <span className={`value ${isPlaying ? 'playing' : ''}`}>
@@ -211,6 +222,7 @@ function App() {
             <>
               <WeatherPanel />
               {scale === 'cellular' && <TissuePanel />}
+              {scale === 'roots' && <SoilPanel overlay={soilOverlay} onOverlay={setSoilOverlay} />}
             </>
           )}
         </aside>

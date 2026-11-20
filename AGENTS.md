@@ -32,6 +32,11 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/components/CellularView.tsx` — composes the scene and frames the camera; `cellular/CellLens.tsx` (instanced cells, mitosis visuals, labels), `cellular/StemDisc.tsx` + `paintDisc.ts` (canvas-textured whole-stem disc), `cellular/geometry.ts` (layout constants), `cellular/palette.ts` (colours shared with the sidebar legend), `cellular/instances.ts` (typed-array instance writer)
 - `src/components/TissuePanel.tsx` — `TissueHud` (status strip over the viewport) and `TissuePanel` (sidebar reference); both sample the store at ~5 Hz instead of re-rendering per tick
 
+### Roots view + soil mineral field (gem epic #1, issue #12 Phase 4)
+- `src/simulation/SoilField.ts` — pure model: `SoilState` = a 24 × 16 vertical soil slice (water, dissolved silica / calcium carbonate, exchangeable Ca, silica / calcite cement, root density, per-column root front and reach, nodules), `stepSoil()` (infiltration, drainage + leaching, capillary flow, evaporation, root uptake, weathering, cementation, nodule nucleation / BCF growth, root front), `SOIL_PROFILES` (`SoilProfileId`: loam / volcanic / limestone), `SPECIES_ROOTS`, read-only helpers `soilMetrics` / `cellSaturation` / `largestGeode`. Reuses `growthLaw` + `rand` from `CrystalGrowth.ts`. `simStore.tick` steps it; its `supply` drives `waterStatus` and its `nutrient` drives `nutrientStatus`
+- `src/components/soil/SoilView.tsx` (slice tiles, roots clipped to `soil.rootFront`, nodules, labels), `soil/rootSkeleton.ts` (deterministic drawn root architecture), `soil/palette.ts` (overlay ramps shared with the legend)
+- `src/components/SoilPanel.tsx` — soil picker, overlays, meters; "Grow its quartz lining in Gem mode" switches to the amethyst geode
+
 ### Parasite mode (epic #3)
 - `src/simulation/parasite/stages.ts` — `LifeStage` + `STAGE_DEFS` (dimensions, speeds) and the **two-gear clock** (`advanceClocks`: action seconds for biomechanics, lesion hours for development)
 - `src/simulation/parasite/bfdSwitch.ts` — BFD1/BFD2 positive-feedback latency latch and the reactivation rule
@@ -67,7 +72,8 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Scaffold complete
 - Working L-system that iterates with plant age
 - Weather affects growth rate + water status
-- 4 view modes (macro / architecture / cellular / roots stub); cellular is a real stem cross-section with animated mitosis, expansion and growth rings
+- 4 view modes (macro / architecture / cellular / roots); cellular is a real stem cross-section with animated mitosis, expansion and growth rings; roots is a soil slice with water, minerals, cement, nodules and the root system
+- Soil mineral field (`SoilField.ts`, 3 soils) under the plant: rain reaches the plant only through it; minerals feed back via calcium nutrition and hardpans; geodes / rhizoliths form around roots
 - 6 species presets
 - Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls
 - Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. 51 unit tests (`npm test`)
@@ -77,7 +83,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 2. Better leaf meshes (or simple instanced planes with better orientation)
 3. ~~Smooth growth interpolation (lerp between L-system generations)~~ (done: `LSystemMorph.ts`; the sim exposes a continuous `lsystemProgress`, the view blends generation `floor(progress)` into the next by its fractional part)
 4. ~~Real cellular cross-section with animated division~~ (done, #13: `TissueGrowth.ts` + cellular view; next: stomata / leaf tissue, anticlinal divisions to widen the cambium)
-5. Soil moisture field + animated water particles into roots
+5. ~~Soil moisture field~~ (done with the soil mineral field, `SoilField.ts`) + animated water particles into roots
 6. WebGPU / TSL upgrade path
 7. ~~Export current plant as GLB~~ (v0 done; revisit after tube branches)
 
@@ -94,7 +100,7 @@ npm test
 
 ### Gem follow-ups
 - TSL optical materials (IOR/dispersion/colour vs T) once the WebGPU path lands (#15, #19) — currently `MeshPhysicalMaterial`
-- Mineral–root co-evolution: soil mineral field, geodes near roots (#12 Phase 4, helps from #10)
+- ~~Mineral–root co-evolution~~ (done: `SoilField.ts` + Roots view). Next: share the substrate with the parasite oocyst field; carry a soil geode's own conditions into the gem crystal instead of the amethyst defaults
 
 ## Notes for Agents
 - Do not break the Zustand tick loop
@@ -105,9 +111,11 @@ npm test
 - The parasite sim is pure and unit-tested — run `npm test` after touching `src/simulation/parasite/`
 - Parasite time is two gears (action seconds vs lesion hours); never collapse them into one clock without reading `docs/design/parasite-mode.md` §3
 - When adding a parasite stage, extend `LifeStage` + `STAGE_DEFS` and add its transitions to `LIFE_CYCLE`
-- When adding species, update `SpeciesId`, `SPECIES_LSYSTEMS` and `SPECIES_TISSUE` (typed on `SpeciesId`, so a missing entry is a compile error)
+- When adding species, update `SpeciesId`, `SPECIES_LSYSTEMS`, `SPECIES_TISSUE` and `SPECIES_ROOTS` (typed on `SpeciesId`, so a missing entry is a compile error)
 - The tissue sim is pure and unit-tested (`TissueGrowth.test.ts`, including a deep-frozen-state purity test) — run `npm test` after touching it; keep new tissue behaviour in `stepTissue` and keep drawing code out of the simulation
 - When adding a gemstone, extend `GemstoneId` and `GEMSTONE_PRESETS`; add a structure to `STRUCTURES` in `CrystalLattice.ts` if it needs a new lattice, and check atom counts / bond lengths against literature
 - Growth rates are tuned to lab-synthesis scale (~0.1–1 mm/day) so they are watchable; stability fields are simplified curves
+- The soil sim is pure and unit-tested (`SoilField.test.ts`, plus coupling tests in `simStore.test.ts`) — run `npm test` after touching it. Plant water comes *only* through the soil now: `waterStatus` relaxes towards `soil.supply` (uptake ÷ transpiration demand), and growth rate is temp × light × water × `nutrientStatus`. Do not add a direct rain → waterStatus shortcut again
+- Soil units: `water` is a fraction of a cell's original pore space (≤ 1 − cement); solutes are stored as amounts (concentration × water) so drying concentrates them; saturation S = c / c_eq. A hardpan (cement ≥ `HARDPAN`) stops roots that have not reached it (`rootReach` per column) — one forming around established roots does not cut them off
 - Prefer small, focused PRs
 - Keep performance in mind (instancing, frustum culling later)

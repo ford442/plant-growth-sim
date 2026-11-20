@@ -4,6 +4,8 @@ export function WeatherPanel() {
   const weather = useSimStore((s) => s.weather)
   const setWeather = useSimStore((s) => s.setWeather)
   const waterStatus = useSimStore((s) => s.waterStatus)
+  // rounded so the panel re-renders when the figure changes, not every tick
+  const nutrientStatus = useSimStore((s) => Math.round(s.nutrientStatus * 100) / 100)
 
   return (
     <div className="panel weather-panel">
@@ -101,6 +103,17 @@ export function WeatherPanel() {
           />
         </div>
         <div className="status-val">{(waterStatus * 100).toFixed(0)}%</div>
+        <div className="status-label">Calcium Nutrition <span className="muted">from the soil</span></div>
+        <div className="bar-track">
+          <div
+            className="bar-fill"
+            style={{
+              width: `${nutrientStatus * 100}%`,
+              background: nutrientStatus > 0.8 ? '#4ade80' : nutrientStatus > 0.5 ? '#fbbf24' : '#f87171',
+            }}
+          />
+        </div>
+        <div className="status-val">{(nutrientStatus * 100).toFixed(0)}%</div>
       </div>
     </div>
   )

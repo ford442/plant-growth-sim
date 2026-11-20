@@ -2,10 +2,11 @@ import { create } from 'zustand'
 import { createCrystalState, stepCrystal, type CrystalState } from '../simulation/CrystalGrowth'
 import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
 import { advanceDevelopment, MIN_ITERATIONS, stageOf } from '../simulation/LSystemMorph'
+import { createSoilState, stepSoil, type SoilProfileId, type SoilState } from '../simulation/SoilField'
 import { createTissueState, stepTissue, type TissueState } from '../simulation/TissueGrowth'
 import { useTimeStore } from './timeStore'
 
-export type { GemstoneId, GeologyState }
+export type { GemstoneId, GeologyState, SoilProfileId }
 
 export type SpeciesId =
   | 'sunflower'
@@ -41,7 +42,8 @@ export interface SimState {
   age: number // days
   height: number // m
   biomass: number // relative
-  waterStatus: number // 0-1 (wilting to turgid)
+  waterStatus: number // 0-1 (wilting to turgid); follows root water uptake from the soil field
+  nutrientStatus: number // 0-1 calcium nutrition from the root zone; scales growth
   growthRate: number // current relative growth rate
 
   // L-system development (for architecture view). `lsystemProgress` is the continuous
@@ -55,6 +57,13 @@ export interface SimState {
 
   // stem tissue (cambium / xylem / phloem cell files; the cellular view derives its geometry from this)
   tissue: TissueState
+
+  // soil slice under the plant: water, dissolved minerals, cement, nodules, roots
+  // (SoilField.ts). Rain reaches the plant only through it.
+  soilProfile: SoilProfileId
+  /** Switch soil parent material: rebuilds the soil field (the plant keeps growing). */
+  setSoilProfile: (p: SoilProfileId) => void
+  soil: SoilState
 
   // gemstone growth (pure state; geometry is derived in the views)
   gemstone: GemstoneId
@@ -75,6 +84,10 @@ const defaultWeather: WeatherState = {
 }
 
 const defaultGemstone: GemstoneId = 'quartz'
+const defaultSoil: SoilProfileId = 'loam'
+/** Days for plant water / nutrition to follow the soil (hydraulic + tissue buffering). */
+const WATER_LAG_DAYS = 1
+const NUTRIENT_LAG_DAYS = 3
 
 export const useSimStore = create<SimState>((set, get) => ({
   species: 'sunflower',
@@ -83,7 +96,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   time: 0,
   tick: (dt) => {
     const { isPlaying, speed } = useTimeStore.getState()
-    const { species, weather, waterStatus, gemstone, geology, lsystemProgress } = get()
+    const { species, weather, waterStatus, nutrientStatus, gemstone, geology, lsystemProgress, soilProfile } = get()
     if (!isPlaying) return
 
     const days = dt * speed
@@ -93,24 +106,33 @@ export const useSimStore = create<SimState>((set, get) => ({
     const waterFactor = waterStatus
     // relative growth rate (0-1): scales biomass/height and, through advanceDevelopment,
     // how fast the architecture develops, so the two can never drift apart
-    const rate = tempFactor * lightFactor * waterFactor
+    const rate = tempFactor * lightFactor * waterFactor * nutrientStatus
     const growth = days * 0.08 * rate
     const progress = advanceDevelopment(lsystemProgress, days, rate)
 
-    set((s) => ({
+    set((s) => {
+      // roots draw on the soil; the soil decides how much of the demand they meet
+      const soil = stepSoil(
+        s.soil,
+        soilProfile,
+        weather,
+        { species, biomass: s.biomass, growth: rate, activity: tempFactor * waterStatus },
+        days
+      )
+      return {
       time: s.time + days,
       age: s.age + days,
       height: Math.min(s.height + growth * 0.35, 4.5),
       biomass: s.biomass + growth,
       waterStatus: Math.max(
         0.05,
-        Math.min(
-          1,
-          s.waterStatus +
-            (weather.precipitation > 0.5 ? 0.15 : -0.02) * days +
-            (weather.humidity - 0.5) * 0.01 * days
-        )
+        Math.min(1, s.waterStatus + (soil.supply - s.waterStatus) * (1 - Math.exp(-days / WATER_LAG_DAYS)))
       ),
+      nutrientStatus: Math.min(
+        1,
+        s.nutrientStatus + (soil.nutrient - s.nutrientStatus) * (1 - Math.exp(-days / NUTRIENT_LAG_DAYS))
+      ),
+      soil,
       growthRate: growth / Math.max(days, 0.001),
       lsystemProgress: progress,
       lsystemIterations: stageOf(progress),
@@ -123,7 +145,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       ),
       // crystals share the same clock (days), so plant and gem modes coexist
       crystal: stepCrystal(s.crystal, gemstone, geology, days),
-    }))
+      }
+    })
   },
   reset: () => {
     useTimeStore.getState().play()
@@ -133,10 +156,12 @@ export const useSimStore = create<SimState>((set, get) => ({
       height: 0.15,
       biomass: 0.1,
       waterStatus: 0.85,
+      nutrientStatus: 1,
       growthRate: 0,
       lsystemProgress: MIN_ITERATIONS,
       lsystemIterations: MIN_ITERATIONS,
       tissue: createTissueState(get().species),
+      soil: createSoilState(get().soilProfile, get().species),
     })
   },
 
@@ -148,6 +173,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   height: 0.15,
   biomass: 0.1,
   waterStatus: 0.85,
+  nutrientStatus: 1,
   growthRate: 0,
 
   lsystemProgress: MIN_ITERATIONS,
@@ -155,6 +181,10 @@ export const useSimStore = create<SimState>((set, get) => ({
   setLsystemIterations: (n) => set({ lsystemProgress: n, lsystemIterations: stageOf(n) }),
 
   tissue: createTissueState('sunflower'),
+
+  soilProfile: defaultSoil,
+  setSoilProfile: (soilProfile) => set((s) => ({ soilProfile, soil: createSoilState(soilProfile, s.species) })),
+  soil: createSoilState(defaultSoil, 'sunflower'),
 
   gemstone: defaultGemstone,
   setGemstone: (gemstone) => {

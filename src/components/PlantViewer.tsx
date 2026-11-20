@@ -1,5 +1,5 @@
-import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useSimStore } from '../stores/simStore'
 import { SPECIES_LSYSTEMS } from '../simulation/LSystem'
@@ -8,9 +8,21 @@ import type { ViewScale } from '../App'
 import { registerPlantRoot } from './plantExport'
 import { CellularView } from './CellularView'
 import { getMorphedPlant, type MorphedPlant } from './plant/MorphedPlant'
+import { SoilView } from './soil/SoilView'
+import type { SoilOverlay } from './soil/palette'
 
 interface Props {
   scale: ViewScale
+  /** Field shown on the soil slice in the Roots view. */
+  soilOverlay?: SoilOverlay
+}
+
+/** Orbit target per plant view: the Roots view looks into the soil. */
+export const PLANT_VIEW_TARGET: Record<ViewScale, [number, number, number]> = {
+  macro: [0, 0, 0],
+  architecture: [0, 0, 0],
+  cellular: [0, 0, 0],
+  roots: [0, -0.7, 0],
 }
 
 // Both layers are re-posed in place every frame by <ArchitectureView/> (see
@@ -43,7 +55,7 @@ function Leaves({ plant, color }: { plant: MorphedPlant; color: string }) {
   )
 }
 
-function ArchitectureView() {
+function ArchitectureView({ ground = true }: { ground?: boolean }) {
   const species = useSimStore((s) => s.species)
   // whole iteration only: React re-renders when the stage steps, not per tick
   const stage = useSimStore((s) => s.lsystemIterations)
@@ -91,51 +103,34 @@ function ArchitectureView() {
     <group ref={group} scale={[scale, scale, scale]} position={[0, 0, 0]}>
       <BranchSegments plant={plant} color={stemColor} />
       <Leaves plant={plant} color={leafColor} />
-      {/* ground disk */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-        <circleGeometry args={[3.5, 48]} />
-        <meshStandardMaterial color="#1a2a1a" roughness={0.95} />
-      </mesh>
+      {/* ground disk (left out over the soil slice, which it would hide) */}
+      {ground && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <circleGeometry args={[3.5, 48]} />
+          <meshStandardMaterial color="#1a2a1a" roughness={0.95} />
+        </mesh>
+      )}
     </group>
   )
 }
 
-function RootsView() {
-  // Simple root system placeholder
-  const roots = useMemo(() => {
-    const pts: THREE.Vector3[] = []
-    for (let i = 0; i < 40; i++) {
-      const a = (i / 40) * Math.PI * 2
-      const r = 0.3 + Math.random() * 1.8
-      const y = -0.2 - Math.random() * 2.2
-      pts.push(new THREE.Vector3(Math.cos(a) * r * 0.6, y, Math.sin(a) * r * 0.6))
+/** The plant above ground and the soil slice it draws on below. */
+function RootsView({ overlay }: { overlay: SoilOverlay }) {
+  // look at the slice face-on (the default camera looks down on the plant);
+  // put the camera back on the way out so the other views keep their framing
+  const camera = useThree((s) => s.camera)
+  useEffect(() => {
+    const before = camera.position.clone()
+    camera.position.set(0.6, 0.4, 7.2)
+    return () => {
+      camera.position.copy(before)
     }
-    return pts
-  }, [])
+  }, [camera])
 
   return (
     <group>
-      {/* soil volume hint */}
-      <mesh position={[0, -1.2, 0]}>
-        <boxGeometry args={[5, 2.4, 5]} />
-        <meshStandardMaterial
-          color="#2a1f14"
-          transparent
-          opacity={0.35}
-          roughness={1}
-        />
-      </mesh>
-      {/* main taproot */}
-      <mesh position={[0, -1.1, 0]}>
-        <cylinderGeometry args={[0.06, 0.02, 2.2, 8]} />
-        <meshStandardMaterial color="#5a4030" />
-      </mesh>
-      {roots.map((p, i) => (
-        <mesh key={i} position={p}>
-          <sphereGeometry args={[0.03 + Math.random() * 0.04, 6, 6]} />
-          <meshStandardMaterial color="#6a5040" />
-        </mesh>
-      ))}
+      <ArchitectureView ground={false} />
+      <SoilView overlay={overlay} />
     </group>
   )
 }
@@ -157,14 +152,14 @@ function MacroView() {
 }
 
 // The simulation tick lives in <SimClock /> (shared with the gem viewer).
-export function PlantViewer({ scale }: Props) {
+export function PlantViewer({ scale, soilOverlay = 'moisture' }: Props) {
   // Root group is registered so the UI can export the on-screen scene as GLB.
   return (
     <group ref={registerPlantRoot} name="plant-scene">
       {scale === 'macro' && <MacroView />}
       {scale === 'architecture' && <ArchitectureView />}
       {scale === 'cellular' && <CellularView />}
-      {scale === 'roots' && <RootsView />}
+      {scale === 'roots' && <RootsView overlay={soilOverlay} />}
     </group>
   )
 }
