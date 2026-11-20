@@ -2,8 +2,10 @@ import { useMemo } from 'react'
 import { useSimStore } from '../stores/simStore'
 import { useTimeStore } from '../stores/timeStore'
 import { useModeStore } from '../stores/modeStore'
+import { useParasiteStore } from '../stores/parasiteStore'
 import { GEMSTONE_PRESETS } from '../simulation/GemstonePresets'
 import { specimenMetrics } from '../simulation/CrystalGrowth'
+import { ACTION_SECONDS_PER_SECOND, LESION_HOURS_PER_SECOND, REFERENCE_SPEED } from '../simulation/parasite/stages'
 
 export function SimControls() {
   const isPlaying = useTimeStore((s) => s.isPlaying)
@@ -11,6 +13,8 @@ export function SimControls() {
   const pause = useTimeStore((s) => s.pause)
   const reset = useSimStore((s) => s.reset)
   const resetCrystal = useSimStore((s) => s.resetCrystal)
+  const resetParasite = useParasiteStore((s) => s.reset)
+  const rerollParasite = useParasiteStore((s) => s.reroll)
   const mode = useModeStore((s) => s.mode)
   const speed = useTimeStore((s) => s.speed)
   const setSpeed = useTimeStore((s) => s.setSpeed)
@@ -27,9 +31,17 @@ export function SimControls() {
         <button className="btn primary" onClick={isPlaying ? pause : play}>
           {isPlaying ? '⏸ Pause' : '▶ Play'}
         </button>
-        <button className="btn" onClick={mode === 'gem' ? resetCrystal : reset}>
+        <button
+          className="btn"
+          onClick={mode === 'parasite' ? resetParasite : mode === 'gem' ? resetCrystal : reset}
+        >
           ↺ Reset
         </button>
+        {mode === 'parasite' && (
+          <button className="btn" onClick={rerollParasite} title="Restart with a different random seed">
+            🎲 Reseed
+          </button>
+        )}
       </div>
 
       <div className="control">
@@ -47,7 +59,9 @@ export function SimControls() {
         />
       </div>
 
-      {mode === 'parasite' ? null : mode === 'gem' ? (
+      {mode === 'parasite' ? (
+        <ParasiteStats />
+      ) : mode === 'gem' ? (
         <CrystalStats />
       ) : (
       <div className="stats-grid">
@@ -111,5 +125,65 @@ function CrystalStats() {
         <span className="stat-value">{crystal.zones.length}</span>
       </div>
     </div>
+  )
+}
+
+/**
+ * Parasite-mode readout. The two gears are shown side by side so the time
+ * abstraction is visible rather than hidden: biomechanics run near real time,
+ * development is compressed roughly 800×.
+ */
+function ParasiteStats() {
+  const speed = useTimeStore((s) => s.speed)
+  const lesionHours = useParasiteStore((s) => Math.floor(s.world.lesionHours))
+  const actionSeconds = useParasiteStore((s) => Math.floor(s.world.actionSeconds))
+  const free = useParasiteStore((s) => s.world.tally.extracellular + s.world.tally.overflow)
+  const inside = useParasiteStore((s) => s.world.tally.intracellular)
+  const brady = useParasiteStore((s) => s.world.tally.bradyzoitesInCysts)
+  const cycles = useParasiteStore((s) => s.world.tally.lyticCycles)
+  const lysed = useParasiteStore((s) => Math.round(s.world.host.cellsLysed))
+
+  const k = speed / REFERENCE_SPEED
+  return (
+    <>
+      <div className="stats-grid">
+        <div className="stat">
+          <span className="stat-label">Lesion clock</span>
+          <span className="stat-value">
+            {lesionHours < 48 ? `${lesionHours} h` : `${(lesionHours / 24).toFixed(1)} d`}
+          </span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Action clock</span>
+          <span className="stat-value">{actionSeconds} s</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Free zoites</span>
+          <span className="stat-value">{free}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">In vacuoles</span>
+          <span className="stat-value">{inside}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Bradyzoites</span>
+          <span className="stat-value">{brady}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Lytic cycles</span>
+          <span className="stat-value">{cycles}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Cells lysed</span>
+          <span className="stat-value">{lysed}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Gearing</span>
+          <span className="stat-value">
+            {(LESION_HOURS_PER_SECOND * k).toFixed(1)} h/s · {(ACTION_SECONDS_PER_SECOND * k).toFixed(0)}× motion
+          </span>
+        </div>
+      </div>
+    </>
   )
 }
