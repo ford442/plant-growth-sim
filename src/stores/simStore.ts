@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createCrystalState, stepCrystal, type CrystalState } from '../simulation/CrystalGrowth'
 import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
+import { advanceDevelopment, MIN_ITERATIONS, stageOf } from '../simulation/LSystemMorph'
 import { createTissueState, stepTissue, type TissueState } from '../simulation/TissueGrowth'
 import { useTimeStore } from './timeStore'
 
@@ -43,7 +44,12 @@ export interface SimState {
   waterStatus: number // 0-1 (wilting to turgid)
   growthRate: number // current relative growth rate
 
-  // L-system iteration (for architecture view)
+  // L-system development (for architecture view). `lsystemProgress` is the continuous
+  // stage — it advances with the weather-driven growth rate, so branching slows, stalls
+  // and resumes together with height/biomass. The view blends generation
+  // floor(progress) into the next by its fractional part (see LSystemMorph.ts), while
+  // `lsystemIterations` stays the whole-iteration count (= floor(progress)).
+  lsystemProgress: number
   lsystemIterations: number
   setLsystemIterations: (n: number) => void
 
@@ -77,7 +83,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   time: 0,
   tick: (dt) => {
     const { isPlaying, speed } = useTimeStore.getState()
-    const { species, weather, waterStatus, gemstone, geology } = get()
+    const { species, weather, waterStatus, gemstone, geology, lsystemProgress } = get()
     if (!isPlaying) return
 
     const days = dt * speed
@@ -85,7 +91,11 @@ export const useSimStore = create<SimState>((set, get) => ({
     const tempFactor = Math.max(0, 1 - Math.abs(weather.temperature - 22) / 25)
     const lightFactor = weather.light
     const waterFactor = waterStatus
-    const growth = days * 0.08 * tempFactor * lightFactor * waterFactor
+    // relative growth rate (0-1): scales biomass/height and, through advanceDevelopment,
+    // how fast the architecture develops, so the two can never drift apart
+    const rate = tempFactor * lightFactor * waterFactor
+    const growth = days * 0.08 * rate
+    const progress = advanceDevelopment(lsystemProgress, days, rate)
 
     set((s) => ({
       time: s.time + days,
@@ -102,7 +112,8 @@ export const useSimStore = create<SimState>((set, get) => ({
         )
       ),
       growthRate: growth / Math.max(days, 0.001),
-      lsystemIterations: Math.min(7, Math.floor(s.age / 3) + 2),
+      lsystemProgress: progress,
+      lsystemIterations: stageOf(progress),
       // cambium divides on the same clock, driven by the same weather and turgor
       tissue: stepTissue(
         s.tissue,
@@ -123,7 +134,8 @@ export const useSimStore = create<SimState>((set, get) => ({
       biomass: 0.1,
       waterStatus: 0.85,
       growthRate: 0,
-      lsystemIterations: 2,
+      lsystemProgress: MIN_ITERATIONS,
+      lsystemIterations: MIN_ITERATIONS,
       tissue: createTissueState(get().species),
     })
   },
@@ -138,8 +150,9 @@ export const useSimStore = create<SimState>((set, get) => ({
   waterStatus: 0.85,
   growthRate: 0,
 
-  lsystemIterations: 2,
-  setLsystemIterations: (n) => set({ lsystemIterations: n }),
+  lsystemProgress: MIN_ITERATIONS,
+  lsystemIterations: MIN_ITERATIONS,
+  setLsystemIterations: (n) => set({ lsystemProgress: n, lsystemIterations: stageOf(n) }),
 
   tissue: createTissueState('sunflower'),
 

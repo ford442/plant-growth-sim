@@ -133,21 +133,47 @@ export interface Segment {
   end: [number, number, number]
   thickness: number
   generation: number
+  /** Index of the drawing symbol (`F`/`G`) in the interpreted string that produced this segment. */
+  src: number
 }
 
 export interface Leaf {
   position: [number, number, number]
   direction: [number, number, number]
   size: number
+  /** Index of the `]` that placed this leaf, or -1 for the final leaf at the plant tip. */
+  src: number
 }
 
-export function interpretLSystem(
-  str: string,
-  def: LSystemDef
-): { segments: Segment[]; leaves: Leaf[] } {
+export interface Interpretation {
+  segments: Segment[]
+  leaves: Leaf[]
+  /**
+   * Turtle position (x, y, z) just before each symbol of the string executes,
+   * 3 floats per symbol. For a non-drawing symbol such as `X` this is where the
+   * bud sits, which is what `LSystemMorph` grows new branches out of.
+   */
+  charPos: Float32Array
+}
+
+/**
+ * Deterministic stand-in for Math.random(): the same leaf ordinal always gets
+ * the same size, so a generation interprets identically every time and two
+ * generations can be morphed into each other.
+ */
+export function hash01(n: number): number {
+  let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b)
+  h ^= h >>> 13
+  h = Math.imul(h, 0xc2b2ae35)
+  h ^= h >>> 16
+  return (h >>> 0) / 4294967296
+}
+
+export function interpretLSystem(str: string, def: LSystemDef): Interpretation {
   const segments: Segment[] = []
   const leaves: Leaf[] = []
   const stack: TurtleState[] = []
+  const charPos = new Float32Array(str.length * 3)
 
   let state: TurtleState = {
     x: 0,
@@ -163,7 +189,11 @@ export function interpretLSystem(
   const angleRad = (def.angle * Math.PI) / 180
   let generation = 0
 
-  for (const ch of str) {
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i]
+    charPos[i * 3] = state.x
+    charPos[i * 3 + 1] = state.y
+    charPos[i * 3 + 2] = state.z
     switch (ch) {
       case 'F':
       case 'G': {
@@ -183,6 +213,7 @@ export function interpretLSystem(
           end,
           thickness: state.thickness,
           generation,
+          src: i,
         })
 
         state.x = end[0]
@@ -224,7 +255,8 @@ export function interpretLSystem(
               Math.sin(state.pitch),
               Math.sin(state.heading) * Math.cos(state.pitch),
             ],
-            size: 0.12 + Math.random() * 0.08,
+            size: 0.12 + hash01(leaves.length) * 0.08,
+            src: i,
           })
           state = stack.pop()!
           generation = Math.max(0, generation - 1)
@@ -246,8 +278,9 @@ export function interpretLSystem(
       position: last.end,
       direction: [0, 1, 0],
       size: 0.15,
+      src: -1,
     })
   }
 
-  return { segments, leaves }
+  return { segments, leaves, charPos }
 }
