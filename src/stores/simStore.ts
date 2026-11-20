@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createCrystalState, stepCrystal, type CrystalState } from '../simulation/CrystalGrowth'
 import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
+import { createTissueState, stepTissue, type TissueState } from '../simulation/TissueGrowth'
 import { useTimeStore } from './timeStore'
 
 export type { GemstoneId, GeologyState }
@@ -46,6 +47,9 @@ export interface SimState {
   lsystemIterations: number
   setLsystemIterations: (n: number) => void
 
+  // stem tissue (cambium / xylem / phloem cell files; the cellular view derives its geometry from this)
+  tissue: TissueState
+
   // gemstone growth (pure state; geometry is derived in the views)
   gemstone: GemstoneId
   /** Switch gemstone: loads its formation conditions and reseeds the crystal. */
@@ -73,7 +77,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   time: 0,
   tick: (dt) => {
     const { isPlaying, speed } = useTimeStore.getState()
-    const { weather, waterStatus, gemstone, geology } = get()
+    const { species, weather, waterStatus, gemstone, geology } = get()
     if (!isPlaying) return
 
     const days = dt * speed
@@ -99,6 +103,13 @@ export const useSimStore = create<SimState>((set, get) => ({
       ),
       growthRate: growth / Math.max(days, 0.001),
       lsystemIterations: Math.min(7, Math.floor(s.age / 3) + 2),
+      // cambium divides on the same clock, driven by the same weather and turgor
+      tissue: stepTissue(
+        s.tissue,
+        species,
+        { temperature: weather.temperature, light: weather.light, water: waterStatus },
+        days
+      ),
       // crystals share the same clock (days), so plant and gem modes coexist
       crystal: stepCrystal(s.crystal, gemstone, geology, days),
     }))
@@ -113,6 +124,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       waterStatus: 0.85,
       growthRate: 0,
       lsystemIterations: 2,
+      tissue: createTissueState(get().species),
     })
   },
 
@@ -128,6 +140,8 @@ export const useSimStore = create<SimState>((set, get) => ({
 
   lsystemIterations: 2,
   setLsystemIterations: (n) => set({ lsystemIterations: n }),
+
+  tissue: createTissueState('sunflower'),
 
   gemstone: defaultGemstone,
   setGemstone: (gemstone) => {

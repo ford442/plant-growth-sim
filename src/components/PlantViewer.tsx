@@ -9,6 +9,7 @@ import {
 } from '../simulation/LSystem'
 import type { ViewScale } from '../App'
 import { registerPlantRoot } from './plantExport'
+import { CellularView } from './CellularView'
 
 interface Props {
   scale: ViewScale
@@ -125,32 +126,6 @@ function ArchitectureView() {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
         <circleGeometry args={[3.5, 48]} />
         <meshStandardMaterial color="#1a2a1a" roughness={0.95} />
-      </mesh>
-    </group>
-  )
-}
-
-function CellularView() {
-  // Placeholder for future cellular cross-section
-  return (
-    <group>
-      <mesh>
-        <cylinderGeometry args={[1.2, 1.2, 0.15, 64]} />
-        <meshStandardMaterial color="#2a4a2a" />
-      </mesh>
-      {/* concentric rings representing growth rings / tissues */}
-      {[0.3, 0.55, 0.8, 1.0].map((r, i) => (
-        <mesh key={i} position={[0, 0.08, 0]}>
-          <torusGeometry args={[r, 0.04, 8, 48]} />
-          <meshStandardMaterial
-            color={i % 2 === 0 ? '#4a7a4a' : '#3a5a3a'}
-            roughness={0.6}
-          />
-        </mesh>
-      ))}
-      <mesh position={[0, 0.2, 0]}>
-        <sphereGeometry args={[0.15, 16, 16]} />
-        <meshStandardMaterial color="#6aaa6a" emissive="#2a4a2a" emissiveIntensity={0.3} />
       </mesh>
     </group>
   )
