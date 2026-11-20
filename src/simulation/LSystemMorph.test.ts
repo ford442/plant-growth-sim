@@ -16,6 +16,7 @@ import {
   rewriteWithParents,
   sampleLeaves,
   sampleSegments,
+  sampleThickness,
   stageOf,
 } from './LSystemMorph'
 
@@ -300,6 +301,53 @@ describe('LSystemMorph', () => {
         }
       }
       expect(newLeaves).toBeGreaterThan(0)
+    })
+  })
+
+  describe('thickness', () => {
+    for (const [name, def] of SPECIES) {
+      it(`${name}: t = 1 is the interpreter's thickness for every segment of the next generation`, () => {
+        const m = createMorphBuilder(def).morph(3)
+        const ref = interpretLSystem(generateLSystem(def.axiom, def.rules, 4), def)
+        const out = new Float32Array(m.segmentCount)
+        sampleThickness(m, 1, out)
+        expect(out).toHaveLength(ref.segments.length)
+        ref.segments.forEach((s, i) => expect(out[i]).toBeCloseTo(s.thickness, 6))
+      })
+
+      it(`${name}: segments that tile an existing one keep its thickness; new twigs start at 0`, () => {
+        const m = createMorphBuilder(def).morph(3)
+        let kept = 0
+        let sprouting = 0
+        for (let j = 0; j < m.segmentCount; j++) {
+          const collapsed = segLength(m.segmentsFrom, j * 6) < EPS
+          if (collapsed) {
+            expect(m.thicknessFrom[j]).toBe(0)
+            sprouting++
+          } else {
+            // a trunk link: identical width before and after, so nothing visibly changes at t = 0
+            expect(m.thicknessFrom[j]).toBeCloseTo(m.thicknessTo[j], 6)
+            kept++
+          }
+        }
+        expect(kept).toBeGreaterThan(0)
+        expect(sprouting).toBeGreaterThan(0)
+      })
+    }
+
+    it('is a straight blend between the two ends and static at the final iteration', () => {
+      const m = createMorphBuilder(SPECIES_LSYSTEMS.oak).morph(3)
+      const mid = new Float32Array(m.segmentCount)
+      sampleThickness(m, 0.5, mid)
+      for (let j = 0; j < m.segmentCount; j++) {
+        expect(mid[j]).toBeCloseTo((m.thicknessFrom[j] + m.thicknessTo[j]) / 2, 6)
+      }
+      const last = createMorphBuilder(SPECIES_LSYSTEMS.oak).morph(MAX_ITERATIONS)
+      const a = new Float32Array(last.segmentCount)
+      const b = new Float32Array(last.segmentCount)
+      sampleThickness(last, 0, a)
+      sampleThickness(last, 0.7, b)
+      expect(a).toEqual(b)
     })
   })
 

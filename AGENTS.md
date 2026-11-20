@@ -23,7 +23,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/components/SimClock.tsx` — the one `useFrame` that calls `tick(dt)`; plant and gem sims share this clock
 - `src/simulation/LSystem.ts` — rules + turtle interpreter per species (deterministic: leaf sizes come from `hash01`, never `Math.random`; segments/leaves carry the `src` symbol index that produced them)
 - `src/simulation/LSystemMorph.ts` — pure smooth growth between L-system iterations: lineage through the rewrite, `createMorphBuilder().morph(n)` → `from`/`to` typed arrays, `sampleSegments` / `sampleLeaves` at any `t`, plus `advanceDevelopment` (the weather-driven development clock) and `morphFactor`
-- `src/components/plant/` — viewer side of the morph: `MorphedPlant.ts` (dynamic branch geometry + leaf instance buffer, re-posed in place, one shared instance per species+stage via `getMorphedPlant`) and `leafMatrix.ts` (hand-expanded `lookAt` + `rotateX(π/2)`, pinned to three.js by a test)
+- `src/components/plant/` — viewer side of the morph: `MorphedPlant.ts` (branch + leaf instance-matrix buffers, re-posed in place, one shared instance per species+stage via `getMorphedPlant`), `leafMatrix.ts` (hand-expanded `lookAt` + `rotateX(π/2)`, pinned to three.js by a test) and `branchMatrix.ts` (branches as **instanced cylinders**: segment start/end/thickness → instance matrix, plus `branchDetail`, the segment budget)
 - `src/components/plant/leafAppearance.ts` (pure, tested: weather + plant status → chlorophyll / wetness / translucency / flutter), `useLeafNodeMaterial.ts` (loads and feeds the TSL leaf material; `null` on classic WebGL → `PlantViewer` draws `meshStandardMaterial`) and `tsl/leafNodeMaterial.ts` (the TSL `MeshSSSNodeMaterial`; **only ever loaded through dynamic `import()`**)
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`
 - `src/components/WeatherPanel.tsx` + `SimControls.tsx` — UI
@@ -80,13 +80,13 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. 51 unit tests (`npm test`)
 
 ## Next High-Value Tasks
-1. Replace lineSegments with proper tube / instanced cylinder branches
+1. ~~Replace lineSegments with proper tube / instanced cylinder branches~~ (done: one instanced cylinder per L-system segment, `branchMatrix.ts`; next: taper along a branch / pipe-model thickening, TSL bark material)
 2. Better leaf meshes (or simple instanced planes with better orientation)
 3. ~~Smooth growth interpolation (lerp between L-system generations)~~ (done: `LSystemMorph.ts`; the sim exposes a continuous `lsystemProgress`, the view blends generation `floor(progress)` into the next by its fractional part)
 4. ~~Real cellular cross-section with animated division~~ (done, #13: `TissueGrowth.ts` + cellular view; next: stomata / leaf tissue, anticlinal divisions to widen the cambium)
 5. ~~Soil moisture field~~ (done with the soil mineral field, `SoilField.ts`) + animated water particles into roots
 6. ~~WebGPU / TSL upgrade path~~ (path documented and prototyped, #19: opt-in `?renderer=webgpu`, TSL leaf material; next: verify on a native WebGPU device, tune translucency/gloss, TSL stems once tube branches land, port gem/parasite modes — see `docs/design/webgpu-tsl.md` §8–9)
-7. ~~Export current plant as GLB~~ (v0 done; revisit after tube branches)
+7. ~~Export current plant as GLB~~ (v0 done; branches now export as instanced cylinder meshes rather than LINES)
 
 ## Running Locally
 ```bash
@@ -108,6 +108,7 @@ npm test
 - Architecture development is `simStore.lsystemProgress` (continuous; `lsystemIterations` is its integer part). It advances by `days × rate / DAYS_PER_ITERATION`, where `rate` is the same weather-driven factor that scales biomass and height, so branching slows, stalls and pauses with growth. Do not drive it from `age` again — that desyncs architecture from the weather
 - The L-system morph is pure and unit-tested (`LSystemMorph.test.ts`, `leafMatrix.test.ts`, `simStore.test.ts`) — run `npm test` after touching `LSystem.ts` or the morph. Interpolation lives in the viewer layer (`useFrame` samples the morph from `useSimStore.getState().lsystemProgress`); the sim never sees the interpolation factor
 - Morph assumptions: every drawing symbol (`F`/`G`) rewrites to at least one drawing symbol (otherwise the removed segment pops out at the start of the morph). Depth-0 draws in a replacement are the trunk and tile their parent; draws inside brackets are side branches that peel off it; draws from a bud (`X`, `A`) grow collapsed out of the bud
+- Branches are `InstancedMesh` cylinders, not tubes: a merged tube mesh would rewrite ≥ 72 floats per segment every frame and bamboo reaches 78 125 segments at the last iteration; an instance costs 16 floats against one shared unit cylinder (re-pose ≈ 0.7 ms for 24 k segments, less than the leaves). The morph carries per-segment `thicknessFrom/To` (`sampleThickness`): trunk links keep their parent's width, side branches and bud-grown twigs start at 0 and thicken as they extend. Radius = `thickness × RADIUS_PER_THICKNESS` (0.5, thickness is the stem width). Each cylinder overhangs its ends by `JOINT_OVERLAP` radii so bends do not open gaps. **Segment budget:** `branchDetail(segmentCount)` coarsens the shared cylinder (10 → 6 → 5 → 4 sides, caps dropped above 15 k) so the worst case stays under ~0.65 M triangles. `frustumCulled={false}` (bounds change every frame), so cost is per plant, not per visible segment; the macro view draws three plants. Real culling / LOD for very large trees (cluster bounds, or dropping the finest twigs far from the camera) is not done yet
 - Known issue (pre-existing, not fixed by the morph): the turtle starts with pitch π/2, where yaw (`+`/`-`) has no sideways effect, and every shipped species only uses `+`/`-`, so all presets currently grow as a straight vertical line. The morph tests also run on rule sets that tilt with `&`/`^` so they exercise real 3D branching
 - The parasite sim is pure and unit-tested — run `npm test` after touching `src/simulation/parasite/`
 - Parasite time is two gears (action seconds vs lesion hours); never collapse them into one clock without reading `docs/design/parasite-mode.md` §3
