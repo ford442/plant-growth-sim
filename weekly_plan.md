@@ -42,7 +42,7 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - [ ] [#17](https://github.com/ford442/plant-growth-sim/issues/17) Replace lineSegments with tube / instanced cylinder branches  
 - [ ] [#18](https://github.com/ford442/plant-growth-sim/issues/18) Better leaf meshes (instanced planes, orientation)  
 - [ ] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations)  
-- [ ] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division  
+- [x] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division — `TissueGrowth.ts` (cambium / xylem / phloem files, growth rings, drought slows division and enlargement) + cellular view with stem disc and cell lens  
 - [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots  
 - [ ] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path  
 - [ ] [#16](https://github.com/ford442/plant-growth-sim/issues/16) Export plant as GLB  
@@ -51,7 +51,7 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - [x] Vite + React + TS + R3F scaffold  
 - [x] Working L-system + species presets  
 - [x] Weather panel + sim controls  
-- [x] Multi-view scale tabs (stubs for cellular/roots)  
+- [x] Multi-view scale tabs (roots is still a stub; cellular is real as of #13)  
 
 ---
 
@@ -174,6 +174,7 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ## Last updated
 
+- **2026-11-20** — Plant #13 landed: the Cellular tab is a real stem cross-section (`src/simulation/TissueGrowth.ts`, `CellularView`, `TissuePanel`) with animated mitosis / expansion, growth rings and weather-driven division. Gem and parasite modes untouched.
 - **2026-11-19** — Track C landed end to end: C0 design lock (`docs/design/parasite-mode.md`), C1–C5 implemented in `src/simulation/parasite/` + `parasiteStore` + `ParasiteViewer`, 51 unit tests. Plant and gem modes untouched.
 
 - **2026-08-12** — Created weekly plan; mirrored gem #1; ingested Gemini *T. gondii* research; opened parasite epic **#3**.  

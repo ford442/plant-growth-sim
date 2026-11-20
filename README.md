@@ -27,7 +27,7 @@ A beautiful, educational, and scientifically grounded web app that lets you:
 ### Multi-scale Views
 1. **Macro** – full plant or small garden with weather effects
 2. **Architecture** – L-system / space-colonization branching with growth animation
-3. **Tissue / Cellular** – cross-sections showing cambium, xylem/phloem, cell division, stomata
+3. **Tissue / Cellular** – a stem cross-section showing cambium, xylem/phloem and growth rings, with the cells dividing, enlarging and hardening (see [Cellular view](#cellular-view)); stomata still to come
 4. **Root Zone** – 3D soil volume, root hairs, water potential gradients, nutrient uptake
 
 ### Plant Species (initial targets)
@@ -39,6 +39,30 @@ A beautiful, educational, and scientifically grounded web app that lets you:
 | Fern / Barnsley | Frond | Classic L-system fractal |
 | Grass / Bamboo | Monocot | Tillering, rapid vertical growth |
 | Vine (e.g. Ivy) | Climber | Thigmotropism, search for support |
+
+## Cellular view
+
+The **🧬 Cellular** tab is a real stem cross-section rather than a decoration. It has two linked pictures:
+
+- **Stem disc** (left) — the whole slice: pith, primary xylem, one band per growth ring (pale earlywood then dark latewood, with vessel pores and medullary rays), the cambium, phloem, cortex and skin. It thickens as wood is added. The white box at 3 o'clock is the strip the lens magnifies.
+- **Cell lens** (right) — that strip at cell scale, one row per radial file, pith on the left and bark on the right. The bright teal column is the **vascular cambium**, the only layer that divides.
+
+What the cells do:
+
+| Process | What you see |
+|---|---|
+| **Cell cycle** | A cambial cell swells through G1 → S → G2 (its nucleus grows and changes shade), waits at a G2/M checkpoint, then runs mitosis: chromosomes condense, line up on the equator, split to the two faces, and a white **cell plate** grows across before the cell divides in two. |
+| **Periclinal division** | The inner daughter leaves as **xylem** and the outer stays cambial; every few divisions (species-dependent) the outer daughter becomes **phloem** instead. |
+| **Expansion and hardening** | New cells swell with turgor, then thicken their walls. Xylem dies as it matures: **vessels** empty into round water-filled pipes (blue) and **fibres** become dense and dark. Late small fibres get the thickest walls, which is what makes latewood dark. |
+| **Growth rings** | One 20-day season is one ring: big thin-walled earlywood cells first (wide vessels in ring-porous oak), small thick-walled latewood last, then a dormant gap in which the cambium rests. Pale lines mark the boundaries. |
+
+Weather drives it through the same inputs as the rest of the plant:
+
+- **Drought** (low plant water status) slows division, and stricter still stops cell *enlargement*, so a mild deficit gives small cells first. Under severe drought cambial cells stop at the G2/M checkpoint, living cells shrivel and dull, vessels fill with air, and the ring comes out narrow.
+- **Cold or heat** arrests the cambium below roughly 4 °C and above roughly 40 °C. **Low light** limits the sugar supply for new cells.
+- Wall hardening only needs warmth, so drought-stunted cells still harden: narrow, dense wood.
+
+The status strip under the viewport says in a sentence what the cambium is doing and why, with live meters for division, enlargement and the cell-cycle mix. The sidebar panel has the ring counts and a legend. Bamboo and fern are shown with the same model for comparison, but note that monocots and ferns have no vascular cambium (the panel says so).
 
 ## Gem mode
 
@@ -153,7 +177,7 @@ npm run dev
 
 ### Phase 2 – Multi-scale
 - [ ] Seamless zoom / scale switcher
-- [ ] Cellular cross-section with mitosis / expansion animation
+- [x] Cellular cross-section with mitosis / expansion animation
 - [ ] Soil moisture visualization + root hair detail
 
 ### Phase 3 – Polish & Export

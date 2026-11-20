@@ -25,6 +25,11 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`
 - `src/components/WeatherPanel.tsx` + `SimControls.tsx` — UI
 
+### Cellular view (plant, issue #13)
+- `src/simulation/TissueGrowth.ts` — pure model: `TissueState` = radial files of cells (pith → xylem → cambium → phloem), a per-season ring record, `stepTissue()` (cambial cell cycle with a G2/M checkpoint, periclinal division, turgor-gated enlargement, wall maturation), `cambialResponse()` (weather → division / enlargement), `SPECIES_TISSUE`, and read-only helpers `layoutFile` / `ringProfile` / `stemMetrics`. `simStore.tick` steps it on the shared clock; `reset()` recreates it
+- `src/components/CellularView.tsx` — composes the scene and frames the camera; `cellular/CellLens.tsx` (instanced cells, mitosis visuals, labels), `cellular/StemDisc.tsx` + `paintDisc.ts` (canvas-textured whole-stem disc), `cellular/geometry.ts` (layout constants), `cellular/palette.ts` (colours shared with the sidebar legend), `cellular/instances.ts` (typed-array instance writer)
+- `src/components/TissuePanel.tsx` — `TissueHud` (status strip over the viewport) and `TissuePanel` (sidebar reference); both sample the store at ~5 Hz instead of re-rendering per tick
+
 ### Parasite mode (epic #3)
 - `src/simulation/parasite/stages.ts` — `LifeStage` + `STAGE_DEFS` (dimensions, speeds) and the **two-gear clock** (`advanceClocks`: action seconds for biomechanics, lesion hours for development)
 - `src/simulation/parasite/bfdSwitch.ts` — BFD1/BFD2 positive-feedback latency latch and the reactivation rule
@@ -60,7 +65,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Scaffold complete
 - Working L-system that iterates with plant age
 - Weather affects growth rate + water status
-- 4 view modes (macro / architecture / cellular stub / roots stub)
+- 4 view modes (macro / architecture / cellular / roots stub); cellular is a real stem cross-section with animated mitosis, expansion and growth rings
 - 6 species presets
 - Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls
 - Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. 51 unit tests (`npm test`)
@@ -69,7 +74,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 1. Replace lineSegments with proper tube / instanced cylinder branches
 2. Better leaf meshes (or simple instanced planes with better orientation)
 3. Smooth growth interpolation (lerp between L-system generations)
-4. Real cellular cross-section with animated division
+4. ~~Real cellular cross-section with animated division~~ (done, #13: `TissueGrowth.ts` + cellular view; next: stomata / leaf tissue, anticlinal divisions to widen the cambium)
 5. Soil moisture field + animated water particles into roots
 6. WebGPU / TSL upgrade path
 7. ~~Export current plant as GLB~~ (v0 done; revisit after tube branches)
@@ -94,7 +99,8 @@ npm test
 - The parasite sim is pure and unit-tested — run `npm test` after touching `src/simulation/parasite/`
 - Parasite time is two gears (action seconds vs lesion hours); never collapse them into one clock without reading `docs/design/parasite-mode.md` §3
 - When adding a parasite stage, extend `LifeStage` + `STAGE_DEFS` and add its transitions to `LIFE_CYCLE`
-- When adding species, update both `SpeciesId` type and `SPECIES_LSYSTEMS`
+- When adding species, update `SpeciesId`, `SPECIES_LSYSTEMS` and `SPECIES_TISSUE` (typed on `SpeciesId`, so a missing entry is a compile error)
+- The tissue sim is pure and unit-tested (`TissueGrowth.test.ts`, including a deep-frozen-state purity test) — run `npm test` after touching it; keep new tissue behaviour in `stepTissue` and keep drawing code out of the simulation
 - When adding a gemstone, extend `GemstoneId` and `GEMSTONE_PRESETS`; add a structure to `STRUCTURES` in `CrystalLattice.ts` if it needs a new lattice, and check atom counts / bond lengths against literature
 - Growth rates are tuned to lab-synthesis scale (~0.1–1 mm/day) so they are watchable; stability fields are simplified curves
 - Prefer small, focused PRs

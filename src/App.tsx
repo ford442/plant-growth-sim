@@ -5,6 +5,7 @@ import { PlantViewer } from './components/PlantViewer'
 import { CrystalViewer, GemLightformers, GEM_VIEW_TARGET, type GemViewOptions, type GemViewScale } from './components/CrystalViewer'
 import { WeatherPanel } from './components/WeatherPanel'
 import { GeologyPanel } from './components/GeologyPanel'
+import { TissueHud, TissuePanel } from './components/TissuePanel'
 import { GemInfoPanel } from './components/GemInfoPanel'
 import { SpeciesSelector } from './components/SpeciesSelector'
 import { GemstoneSelector } from './components/GemstoneSelector'
@@ -165,6 +166,7 @@ function App() {
           )}
 
           {isParasite && <ParasiteViewportHint scale={parasiteScale} />}
+          {!isParasite && !isGem && scale === 'cellular' && <TissueHud />}
 
           {/* Overlay HUD */}
           <div className="hud">
@@ -206,7 +208,10 @@ function App() {
               <GemInfoPanel scale={gemScale} options={gemOptions} onOptions={setGemOptions} />
             </>
           ) : (
-            <WeatherPanel />
+            <>
+              <WeatherPanel />
+              {scale === 'cellular' && <TissuePanel />}
+            </>
           )}
         </aside>
       </div>
