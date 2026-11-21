@@ -59,9 +59,9 @@ export interface GemAppearance {
 }
 
 const LUSTER = {
-  vitreous: { specularIntensity: 0.8, clearcoat: 0.45, envMapIntensity: 2.0 },
-  subadamantine: { specularIntensity: 1.0, clearcoat: 0.7, envMapIntensity: 2.6 },
-  adamantine: { specularIntensity: 1.0, clearcoat: 1.0, envMapIntensity: 3.2 },
+  vitreous: { specularIntensity: 0.7, clearcoat: 0.25, envMapIntensity: 1.1 },
+  subadamantine: { specularIntensity: 0.9, clearcoat: 0.5, envMapIntensity: 1.5 },
+  adamantine: { specularIntensity: 1.0, clearcoat: 0.9, envMapIntensity: 2.4 },
 } as const
 
 // --- colour helpers (hex in, hex out) -------------------------------------------
@@ -111,7 +111,7 @@ export function blackbodyColor(tC: number): string {
 // --- appearance -----------------------------------------------------------------
 
 /** Below the Draper point (~525 °C) nothing glows; a 1500 °C melt is bright orange-white. */
-export const incandescenceOf = (tC: number) => 0.15 * smoothstep(650, 1600, tC)
+export const incandescenceOf = (tC: number) => 0.07 * smoothstep(650, 1600, tC)
 
 /** Fraction of a zone's volume that grew fast enough to trap inclusions. */
 const trapping = (saturation: number) => smoothstep(1.15, 2.0, saturation)

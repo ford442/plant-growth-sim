@@ -66,7 +66,10 @@ export interface GemLook {
   inclusions: { kind: InclusionKind; color: string; density: number }
   /** Multiplier on the material dispersion so "fire" reads on screen. */
   fire: number
-  /** Path length (mm) over which a fully doped crystal reaches its body colour. */
+  /**
+   * Beer–Lambert length (mm) at full dopant: a mature crystal (path ≈ its
+   * radius) should be ~1–1.5 of these thick, or it renders as a dark blob.
+   */
   absorptionMm: number
 }
 
@@ -212,7 +215,7 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
       thermochromism: null,
       inclusions: { kind: 'veils', color: '#ffffff', density: 0.35 },
       fire: 10,
-      absorptionMm: 14,
+      absorptionMm: 12,
     },
     bodyColor: (imp) => lerpColor('#f6f8fb', '#5a4535', Math.pow(clamp01(imp), 0.8)),
     dopant: { element: 'Al', replaces: 'Si', label: 'Al³⁺ (smoky centres)', maxLabel: '≈ 200 ppm', effect: 'Al³⁺ + irradiation → smoky' },
@@ -270,7 +273,7 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
       thermochromism: null,
       inclusions: { kind: 'zoning', color: '#6a2fb8', density: 0.8 },
       fire: 10,
-      absorptionMm: 10,
+      absorptionMm: 8,
     },
     bodyColor: (imp, growthT, peakT) => {
       // Fe³⁺ only forms colour centres when it grows cool; heating bleaches irreversibly
@@ -346,7 +349,7 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
       thermochromism: null,
       inclusions: { kind: 'pinpoint', color: '#1a1a1f', density: 0.25 },
       fire: 22,
-      absorptionMm: 8,
+      absorptionMm: 5,
     },
     bodyColor: (imp) => lerpColor('#fbfdff', '#f0cf3a', Math.pow(clamp01(imp), 1.1) * 0.9),
     dopant: { element: 'N', replaces: 'C', label: 'N (type Ib)', maxLabel: '≈ 300 ppm', effect: 'isolated N → yellow' },
@@ -402,7 +405,7 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
       thermochromism: { color: '#6f8a5a', from: 300, to: 900 }, // hot ruby turns green-grey, red again on cooling
       inclusions: { kind: 'silk', color: '#fff3e8', density: 0.6 },
       fire: 11,
-      absorptionMm: 3,
+      absorptionMm: 7,
     },
     bodyColor: (imp) =>
       rampColor(
@@ -471,7 +474,7 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
       thermochromism: null,
       inclusions: { kind: 'jardin', color: '#3c5a3a', density: 0.75 },
       fire: 10,
-      absorptionMm: 4,
+      absorptionMm: 8,
     },
     bodyColor: (imp) => lerpColor('#e8f3ec', '#0e9a50', Math.pow(clamp01(imp), 0.85)),
     dopant: { element: 'Cr', replaces: 'Al', label: 'Cr³⁺ / V³⁺', maxLabel: '≈ 1 wt% Cr₂O₃', effect: 'Cr³⁺/V³⁺ → emerald green' },
@@ -534,7 +537,7 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
       thermochromism: null,
       inclusions: { kind: 'cleavage', color: '#ffffff', density: 0.5 },
       fire: 10,
-      absorptionMm: 9,
+      absorptionMm: 10,
     },
     bodyColor: (imp) => lerpColor('#f3f6fa', '#e4893a', Math.pow(clamp01(imp), 0.9)),
     dopant: { element: 'Cr', replaces: 'Al', label: 'Cr³⁺ (imperial)', maxLabel: '≈ 0.1 wt% Cr₂O₃', effect: 'Cr³⁺ → imperial orange-pink' },

@@ -12,8 +12,9 @@ export interface GemMaterial {
   isNode: boolean
   /**
    * Push the current appearance in. `worldPerMm` converts the Beer–Lambert
-   * distance into scene units, `thickness` is the specimen's size in scene
-   * units (the transmission model's path length). Allocation-free; call every frame.
+   * distance into scene units, `thickness` is the light path through the
+   * specimen (≈ its radius; GemstoneDef.look.absorptionMm is tuned to that) in the units
+   * three expects: the mesh's local units, since three multiplies it by the model matrix scale. Allocation-free; call every frame.
    */
   update(a: GemAppearance, frost: number, worldPerMm: number, thickness: number): void
 }
@@ -36,7 +37,7 @@ function applyPhysical(m: THREE.MeshPhysicalMaterial, a: GemAppearance, frost: n
     m.transmission = 0.96 - 0.2 * frost
     m.clearcoatRoughness = 0.05 + 0.45 * frost
     // fluorescence + incandescence + a faint body glow, summed into one emissive colour
-    m.emissive.set(a.body).multiplyScalar(0.06)
+    m.emissive.set(a.body).multiplyScalar(0.14) // light scattered inside the stone
     m.emissive.add(tmp.set(a.fluorescenceColor).multiplyScalar(a.fluorescence * 0.3))
     m.emissive.add(tmp.set(a.incandescenceColor).multiplyScalar(a.incandescence))
     m.emissiveIntensity = 1

@@ -160,7 +160,9 @@ export function createGemNodeMaterial(kind: InclusionKind): GemNodeMaterial {
     const fluor = uFluorColor.mul(uFluor).mul(facing.mul(0.6).add(0.4)).mul(0.35)
     const glow = uGlowColor.mul(uGlow).mul(facing.mul(0.7).add(0.3))
     const glint = vec3(1, 0.97, 0.92).mul(inc.glint).mul(0.35)
-    return fluor.add(glow).add(glint)
+    // light scattered inside the stone, in the colour of the face you look through
+    const body = mix(uAcross, uAlong, pleo.mul(pleo)).mul(inc.shade).mul(0.14)
+    return fluor.add(glow).add(glint).add(body)
   })()
 
   const etch = Fn(() => smoothstep(-0.2, 0.6, mx_noise_float(positionGeometry.mul(28.0))))()

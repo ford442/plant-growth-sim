@@ -202,7 +202,7 @@ function FormationView({ def, faceIndexing }: { def: GemstoneDef; faceIndexing: 
     const mesh = meshRef.current
     if (!mesh) return
     // a typical crystal of the druse sets the transmission path length
-    const heroRadius = step(dt, faceIndexing, MM, (r) => Math.max(0.05, r * MM * 1.6))
+    const heroRadius = step(dt, faceIndexing, MM, (r) => Math.max(0.05, r * MM))
     const { crystal } = useSimStore.getState()
     const embed = EMBED[def.substrate]
     const n = Math.min(capacity, crystal.nuclei.length)
@@ -341,7 +341,10 @@ function CrystalView({ def, options }: { def: GemstoneDef; options: GemViewOptio
   const seen = useRef(-1)
 
   useFrame((_, dt) => {
-    const r = step(dt, options.faceIndexing, worldPerMm, (radius) => Math.max(radius * worldPerMm, 0.02) * 2)
+    // three scales `thickness` by the mesh's own scale, and this mesh is the unit-radius habit
+    // scaled to size: a path of one radius is thickness 1 (the formation view's instance scale is not
+    // part of the model matrix, so it passes world units instead)
+    const r = step(dt, options.faceIndexing, worldPerMm, () => 1)
     const s = Math.max(r * worldPerMm, 0.02)
     meshRef.current?.scale.setScalar(s)
     edgesRef.current?.scale.setScalar(s * 1.001)
@@ -477,7 +480,8 @@ function GradientDome() {
   }, [])
   useEffect(() => () => geo.dispose(), [geo])
   return (
-    <mesh geometry={geo}>
+    // drawn first so the additive backlight lands on top of it
+    <mesh geometry={geo} renderOrder={-2}>
       <meshBasicMaterial vertexColors side={THREE.BackSide} fog={false} depthWrite={false} />
     </mesh>
   )
@@ -503,9 +507,10 @@ function radialGlow(): THREE.CanvasTexture {
   c.width = c.height = 128
   const g = c.getContext('2d')!
   const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
-  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
-  grad.addColorStop(0.35, 'rgba(255,255,255,0.35)')
-  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  // fades to black, not to transparent: the glow is drawn opaque + additive (see Backlight)
+  grad.addColorStop(0, 'rgb(230,230,230)')
+  grad.addColorStop(0.35, 'rgb(89,89,89)')
+  grad.addColorStop(1, 'rgb(0,0,0)')
   g.fillStyle = grad
   g.fillRect(0, 0, 128, 128)
   glowTexture = new THREE.CanvasTexture(c)
@@ -516,6 +521,8 @@ function radialGlow(): THREE.CanvasTexture {
 function Backlight({ color }: { color: string }) {
   const ref = useRef<THREE.Mesh>(null)
   const tint = useMemo(() => lerpColor('#8f86c8', color, 0.35), [color])
+  // the old 0.55 opacity, folded into the colour now that the glow is additive
+  const tintDim = useMemo(() => new THREE.Color(tint).multiplyScalar(0.55), [tint])
   const center = useMemo(() => new THREE.Vector3(0, CRYSTAL_Y, 0), [])
   const dir = useMemo(() => new THREE.Vector3(), [])
   useFrame(({ camera }) => {
@@ -525,9 +532,11 @@ function Backlight({ color }: { color: string }) {
     ref.current.quaternion.copy(camera.quaternion)
   })
   return (
-    <mesh ref={ref}>
+    <mesh ref={ref} renderOrder={-1}>
       <planeGeometry args={[11, 11]} />
-      <meshBasicMaterial map={radialGlow()} color={tint} transparent opacity={0.55} depthWrite={false} toneMapped={false} fog={false} />
+      {/* opaque + additive: three's transmission pass only captures opaque objects, so a
+          transparent glow would never be seen *through* the gem (it would transmit black) */}
+      <meshBasicMaterial map={radialGlow()} color={tintDim} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} fog={false} />
     </mesh>
   )
 }

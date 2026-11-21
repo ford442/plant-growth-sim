@@ -113,6 +113,16 @@ describe('gemAppearance', () => {
     expect(gemAppearance(def, hi.s, hi.env).attenuationMm).toBeLessThan(gemAppearance(def, lo.s, lo.env).attenuationMm)
   })
 
+  it('a mature, fully doped crystal is coloured, not black: path ≤ ~1.5 Beer–Lambert lengths', () => {
+    for (const id of IDS) {
+      const def = GEMSTONE_PRESETS[id]
+      const { s, env } = grow(id, { impurity: 1 }, 400, 200)
+      const a = gemAppearance(def, s, env)
+      expect(s.nuclei[0].radius / a.attenuationMm, id).toBeLessThan(1.6)
+      expect(def.kinetics.maxRadius / a.attenuationMm, id).toBeGreaterThan(0.5)
+    }
+  })
+
   it('fluorescence follows the dopant: ruby glows red, quartz does not', () => {
     const r = grow('ruby')
     const rubyF = gemAppearance(GEMSTONE_PRESETS.ruby, r.s, r.env)
@@ -129,7 +139,7 @@ describe('gemAppearance', () => {
     const q = grow('quartz')
     expect(gemAppearance(GEMSTONE_PRESETS.quartz, q.s, q.env).incandescence).toBe(0)
     const d = grow('diamond')
-    expect(gemAppearance(GEMSTONE_PRESETS.diamond, d.s, d.env).incandescence).toBeGreaterThan(0.1)
+    expect(gemAppearance(GEMSTONE_PRESETS.diamond, d.s, d.env).incandescence).toBeGreaterThan(0.03)
 
     const r = grow('ruby')
     const cool = gemAppearance(GEMSTONE_PRESETS.ruby, r.s, { ...r.env, temperature: 450 })

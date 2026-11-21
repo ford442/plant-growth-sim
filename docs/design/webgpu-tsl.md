@@ -99,6 +99,30 @@ the same colour physics; the TSL path adds the inclusion scene.
 | Etch frost while dissolving | `roughnessNode` with etch-pit noise, `transmissionNode` drops | roughness / transmission only |
 | Inclusions | procedural in `positionGeometry` (habit-local, so under instancing they stay inside each crystal): veils, colour-zoning bands, pinpoints, three-way rutile silk, mossy jardin, basal cleavage cracks with `iridescenceNode` | — |
 
+Walked with `?renderer=webgpu` in headless Chromium (WebGL2 node backend,
+SwiftShader): formation / crystal / lattice for all six gems, 0 console errors.
+Two gotchas found on the way:
+
+- `<Environment>` **with `<Lightformer>` children** (gem softboxes) logs
+  `GL_INVALID_OPERATION: glFramebufferTexture2D` every frame on the node
+  renderer's WebGL2 backend (its cube-camera render target). The softboxes are
+  only mounted on the classic renderer; the `city` preset alone is fine. Facet
+  reflections are therefore plainer under `?renderer=webgpu` — port them to a
+  node-built environment later.
+- The backdrop glow (`Backlight`, `toneMapped={false}`) reads brighter under
+  `WebGPURenderer` — the same output-pass tone-mapping difference as §7.
+
+- Transmission only refracts **opaque** objects. The studio backlight used to be
+  a transparent sprite, so gems transmitted black and showed mostly the warm
+  environment reflection (emerald read brown). It is now opaque + additive with
+  a texture that fades to black, so it is seen through the stone — on both backends.
+- three multiplies `thickness` by the mesh's model-matrix scale. The crystal
+  view scales a unit-radius habit, so its thickness is local (1 = one radius);
+  the formation view's instance scale is not in the model matrix, so it passes
+  world units.
+
+Not verified: the look on a native WebGPU device, and frame cost.
+
 Drei's `<Sparkles>` is a `ShaderMaterial`, which `WebGPURenderer` cannot draw;
 the formation view's fluid shimmer is now an instanced basic-material mesh.
 
