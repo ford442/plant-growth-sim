@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { SPECIES_LSYSTEMS } from '../../simulation/LSystem'
+import { createMorphBuilder } from '../../simulation/LSystemMorph'
 import { getMorphedPlant } from './MorphedPlant'
 
 describe('MorphedPlant.top', () => {
@@ -9,10 +11,11 @@ describe('MorphedPlant.top', () => {
     expect(t0).toBeGreaterThan(0)
     p.setMorph(1)
     expect(p.top).toBeGreaterThanOrEqual(t0) // growing towards the next stage never lowers the top
-    const a = p.branchGeometry.getAttribute('position').array as Float32Array
+    // at t = 1 the pose is exactly the next generation's segment end points
+    const pts = createMorphBuilder(SPECIES_LSYSTEMS.sunflower).morph(3).segmentsTo
     let max = -Infinity
-    for (let i = 1; i < a.length; i += 3) max = Math.max(max, a[i])
-    expect(p.top).toBe(Math.max(0, max))
+    for (let i = 1; i < pts.length; i += 3) max = Math.max(max, pts[i])
+    expect(p.top).toBeCloseTo(Math.max(0, max), 4)
   })
 
   it('is taller at a later stage', () => {
