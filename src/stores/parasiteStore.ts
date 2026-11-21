@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { advanceClocks } from '../simulation/parasite/stages'
+import { advanceFixed } from '../simulation/parasite/fixedStep'
 import type { EffectorFlags, NicheId, StressLevers } from '../simulation/parasite/hostImmunity'
 import {
   DEFAULT_MODIFIERS,
@@ -22,7 +22,6 @@ import {
   ingestOocysts,
   seedEnvironment,
   shedToEnvironment,
-  stepWorld,
   type ParasiteConfig,
   type ParasiteWorld,
 } from '../simulation/parasite/world'
@@ -43,6 +42,13 @@ export interface ParasiteState {
   progress: ObjectiveProgress
   /** Seed of the current run, so a run can be replayed exactly. */
   seed: number
+  /**
+   * Real time not yet spent, as a fraction of one fixed step (always in
+   * [0, 1)). `tick` converts each frame's `dt` into whole fixed steps and keeps
+   * the remainder here, so a run depends on the seed and the step count, never
+   * on the frame rate. See `simulation/parasite/fixedStep.ts`.
+   */
+  accumulator: number
 
   tick: (dt: number) => void
   reset: () => void
@@ -81,7 +87,7 @@ const INITIAL_SEED = 20260812
 
 function freshRun(objective: ObjectiveId, config: ParasiteConfig, seed: number) {
   const world = startWorld(objective, config, seed)
-  return { world, progress: evaluateObjective(objective, world, config), seed }
+  return { world, progress: evaluateObjective(objective, world, config), seed, accumulator: 0 }
 }
 
 const initialConfig = configFor(DEFAULT_OBJECTIVE, DEFAULT_CONFIG)
@@ -94,15 +100,27 @@ export const useParasiteStore = create<ParasiteState>((set, get) => ({
   tick: (dt) => {
     const { isPlaying, speed } = useTimeStore.getState()
     if (!isPlaying) return
-    const { world, config, objective, progress } = get()
+    const { world, config, objective, progress, accumulator } = get()
     // a resolved objective freezes the run until the player resets
     if (progress.status !== 'active') return
 
-    const next = stepWorld(world, config, advanceClocks(dt, speed))
-    const nextProgress = evaluateObjective(objective, next, config)
+    // Spend this frame's real time as whole fixed steps. The objective is
+    // judged after *every* step, so a win or a loss lands on the same step
+    // whatever the frame rate, and no step runs past it.
+    let latest = progress
+    const result = advanceFixed(world, config, accumulator, dt, speed, (w) => {
+      latest = evaluateObjective(objective, w, config)
+      return latest.status !== 'active'
+    })
+    if (result.steps === 0) {
+      // nothing owed yet (low speed or a short frame): bank the time, leave
+      // the world alone so nothing re-renders
+      if (result.accumulator !== accumulator) set({ accumulator: result.accumulator })
+      return
+    }
     // pause on the win/lose beat so the result is readable
-    if (nextProgress.status !== 'active') useTimeStore.getState().pause()
-    set({ world: next, progress: nextProgress })
+    if (latest.status !== 'active') useTimeStore.getState().pause()
+    set({ world: result.world, progress: latest, accumulator: result.accumulator })
   },
 
   reset: () => {
