@@ -13,8 +13,10 @@ still defaults to the classic `WebGLRenderer`; nothing changes unless you ask.
 - It never *requires* WebGPU. No adapter → `WebGPURenderer` runs on its WebGL2
   backend (TSL compiles to GLSL). Module fails to load → plain `WebGLRenderer`.
   Leaf chunk fails to load → the ordinary `meshStandardMaterial` stays.
-- Only plant mode honours the opt-in. Gem and parasite always stay on WebGL
+- Plant and gem modes honour the opt-in. Parasite always stays on WebGL
   (`NODE_READY_MODES` in `src/rendering/rendererPreference.ts`).
+- Gem mode (#15): gems are shaded by a TSL `MeshPhysicalNodeMaterial`
+  (`src/components/gem/tsl/gemNodeMaterial.ts`) — see §4b.
 
 ## 2. Audit (this repo, `package.json` / lockfile)
 
@@ -36,7 +38,7 @@ against `vite preview`: default loads one JS file, `?renderer=webgpu` loads thre
 ```
 getGraphicsCapability()          boot probe: WebGL2 tier + "did requestAdapter() succeed?"
         │
-backendForMode(mode, preference) plant → the user's preference; gem/parasite → always 'webgl'
+backendForMode(mode, preference) plant/gem → the user's preference; parasite → always 'webgl'
         │
 rendererFactory({backend, capability})        (R3F `gl` factory; Canvas is re-keyed on backend)
    ├─ 'webgl'   → THREE.WebGLRenderer
@@ -79,6 +81,26 @@ dry-leaf colour at `waterStatus < 0.35`); `precipitation` / `humidity` → wetne
 (smoothed on frame time, quick to wet, slow to dry); `waterStatus` →
 translucency; `wind` → flutter. They are written to **uniforms** each frame, so
 weather never recompiles a pipeline.
+
+## 4b. The gem material (#15)
+
+`MeshPhysicalNodeMaterial` on the specimen habit (`gem/habitGeometry.ts`). Inputs
+come from `gemAppearance()` (`src/simulation/GemOptics.ts`, pure and unit-tested),
+shared with the classic `MeshPhysicalMaterial` fallback, so both backends show
+the same colour physics; the TSL path adds the inclusion scene.
+
+| Effect | Mechanism | Classic fallback |
+| --- | --- | --- |
+| IOR, dispersion ("fire"), Beer–Lambert colour | plain physical properties, updated per frame (no recompile) | same |
+| Pleochroism | `pleo` attribute = \|n·c\| → mix of the along-c / across-c colours | same colours as vertex colours |
+| Fluorescence (Cr³⁺ ruby, N3 diamond…) | `emissiveNode`, stronger head-on | summed into `emissive` |
+| Incandescence (> 600 °C) | blackbody colour from the current T, `emissiveNode` | summed into `emissive` |
+| Thermochromism (hot ruby) | in the body / attenuation colour | same |
+| Etch frost while dissolving | `roughnessNode` with etch-pit noise, `transmissionNode` drops | roughness / transmission only |
+| Inclusions | procedural in `positionGeometry` (habit-local, so under instancing they stay inside each crystal): veils, colour-zoning bands, pinpoints, three-way rutile silk, mossy jardin, basal cleavage cracks with `iridescenceNode` | — |
+
+Drei's `<Sparkles>` is a `ShaderMaterial`, which `WebGPURenderer` cannot draw;
+the formation view's fluid shimmer is now an instanced basic-material mesh.
 
 ## 5. Rules for writing the next TSL material here
 
@@ -161,5 +183,6 @@ native WebGPU backend was never exercised.
 - Real-GPU pass: tune translucency (`thickness*` nodes) and wet gloss; measure frame time.
 - Better leaf silhouette (alpha-masked from `uv()`) and instanced-leaf meshes (AGENTS.md #2).
 - Rain droplets and a stem/bark material once tube branches exist.
-- Gem optical materials (IOR, dispersion — #15) and the parasite pellicle / cyst wall (#3) are the next TSL consumers; both modes must first pass §8.
+- ~~Gem optical materials (IOR, dispersion — #15)~~ done (§4b). Next: per-ray pleochroism (needs the instance matrix in the node graph), zone shells seen through the stone, asterism.
+- The parasite pellicle / cyst wall (#3) is the next TSL consumer; it must first pass §8.
 - Default to WebGPU only after §6's unverified rows are verified on hardware.

@@ -224,6 +224,7 @@ function App() {
             <>
               <GeologyPanel />
               <GemInfoPanel scale={gemScale} options={gemOptions} onOptions={setGemOptions} />
+              <RendererPanel />
             </>
           ) : (
             <>

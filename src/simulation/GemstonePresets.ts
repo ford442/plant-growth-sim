@@ -40,6 +40,36 @@ export interface FaceFamilyDef extends FaceFamilySpec {
 
 export type SubstrateKind = 'plate' | 'geode' | 'kimberlite'
 
+/**
+ * Inclusion scene typical of the gem — drawn procedurally by the TSL material.
+ *  - veils:    healed-fracture fluid veils (rock crystal)
+ *  - zoning:   sector / chevron colour bands (amethyst)
+ *  - pinpoint: tiny dark graphite / sulphide crystals (diamond)
+ *  - silk:     rutile needles at 60° in the basal plane (ruby; asterism)
+ *  - jardin:   mossy fractures and fluid "garden" (emerald)
+ *  - cleavage: perfect basal cleavage cracks catching light (topaz)
+ */
+export type InclusionKind = 'veils' | 'zoning' | 'pinpoint' | 'silk' | 'jardin' | 'cleavage'
+
+export interface GemLook {
+  luster: 'vitreous' | 'subadamantine' | 'adamantine'
+  /**
+   * Dichroism of the chromophore: the tint seen looking along the c-axis (the
+   * ordinary ray) and across it. Multiplies the body colour, so a colourless
+   * (undoped) crystal shows none. `null` for cubic / isotropic gems.
+   */
+  pleochroism: { alongC: string; acrossC: string } | null
+  /** Dopant-driven photoluminescence under the studio light (Cr³⁺ red, N3 blue). */
+  fluorescence: { color: string; strength: number } | null
+  /** Reversible colour while hot (not recorded in the zones), e.g. hot ruby goes green-grey. */
+  thermochromism: { color: string; from: number; to: number } | null
+  inclusions: { kind: InclusionKind; color: string; density: number }
+  /** Multiplier on the material dispersion so "fire" reads on screen. */
+  fire: number
+  /** Path length (mm) over which a fully doped crystal reaches its body colour. */
+  absorptionMm: number
+}
+
 export interface GemstoneDef {
   id: GemstoneId
   name: string
@@ -77,6 +107,8 @@ export interface GemstoneDef {
     hardness: number // Mohs
     roughness: number
   }
+  /** What makes this gem look like itself beyond IOR and colour (GemOptics.ts). */
+  look: GemLook
   /** Body colour of a growth zone: dopant level, T while it grew, peak T since. */
   bodyColor: (impurity: number, growthT: number, peakT: number) => string
   dopant: { element: string; replaces: string; label: string; maxLabel: string; effect: string }
@@ -173,6 +205,15 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
     substrate: 'plate',
     substrateColor: '#5b5348',
     optics: { ior: 1.544, dispersion: 0.013, birefringence: 0.009, density: 2.65, hardness: 7, roughness: 0.03 },
+    look: {
+      luster: 'vitreous',
+      pleochroism: { alongC: '#f2f0ec', acrossC: '#d8cdbf' }, // smoky quartz: weak brown dichroism
+      fluorescence: null,
+      thermochromism: null,
+      inclusions: { kind: 'veils', color: '#ffffff', density: 0.35 },
+      fire: 10,
+      absorptionMm: 14,
+    },
     bodyColor: (imp) => lerpColor('#f6f8fb', '#5a4535', Math.pow(clamp01(imp), 0.8)),
     dopant: { element: 'Al', replaces: 'Si', label: 'Al³⁺ (smoky centres)', maxLabel: '≈ 200 ppm', effect: 'Al³⁺ + irradiation → smoky' },
     lattice: 'alpha-quartz',
@@ -222,6 +263,15 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
     substrate: 'geode',
     substrateColor: '#6b5d52',
     optics: { ior: 1.544, dispersion: 0.013, birefringence: 0.009, density: 2.65, hardness: 7, roughness: 0.03 },
+    look: {
+      luster: 'vitreous',
+      pleochroism: { alongC: '#c9a3ff', acrossC: '#ff9fd0' }, // weak: bluish-violet / reddish-purple
+      fluorescence: null,
+      thermochromism: null,
+      inclusions: { kind: 'zoning', color: '#6a2fb8', density: 0.8 },
+      fire: 10,
+      absorptionMm: 10,
+    },
     bodyColor: (imp, growthT, peakT) => {
       // Fe³⁺ only forms colour centres when it grows cool; heating bleaches irreversibly
       const fe = Math.pow(clamp01(imp), 0.8) * (1 - smoothstep(230, 380, growthT))
@@ -289,6 +339,15 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
     substrate: 'kimberlite',
     substrateColor: '#2f3a34',
     optics: { ior: 2.417, dispersion: 0.044, birefringence: 0, density: 3.52, hardness: 10, roughness: 0.01 },
+    look: {
+      luster: 'adamantine',
+      pleochroism: null, // cubic: optically isotropic
+      fluorescence: { color: '#4f7dff', strength: 0.35 }, // N3 centre blue (weak here: type Ib is mostly inert)
+      thermochromism: null,
+      inclusions: { kind: 'pinpoint', color: '#1a1a1f', density: 0.25 },
+      fire: 22,
+      absorptionMm: 8,
+    },
     bodyColor: (imp) => lerpColor('#fbfdff', '#f0cf3a', Math.pow(clamp01(imp), 1.1) * 0.9),
     dopant: { element: 'N', replaces: 'C', label: 'N (type Ib)', maxLabel: '≈ 300 ppm', effect: 'isolated N → yellow' },
     lattice: 'diamond',
@@ -336,6 +395,15 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
     substrate: 'plate',
     substrateColor: '#d9d6cf',
     optics: { ior: 1.766, dispersion: 0.018, birefringence: 0.008, density: 4.0, hardness: 9, roughness: 0.03 },
+    look: {
+      luster: 'subadamantine',
+      pleochroism: { alongC: '#d0306a', acrossC: '#ff6a3a' }, // strong: purplish-red (ω) / orange-red (ε)
+      fluorescence: { color: '#ff1a2a', strength: 1 }, // Cr³⁺ R-lines at 694 nm — rubies glow under light
+      thermochromism: { color: '#6f8a5a', from: 300, to: 900 }, // hot ruby turns green-grey, red again on cooling
+      inclusions: { kind: 'silk', color: '#fff3e8', density: 0.6 },
+      fire: 11,
+      absorptionMm: 3,
+    },
     bodyColor: (imp) =>
       rampColor(
         [
@@ -396,6 +464,15 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
     substrate: 'plate',
     substrateColor: '#24262a',
     optics: { ior: 1.577, dispersion: 0.014, birefringence: 0.006, density: 2.76, hardness: 7.75, roughness: 0.04 },
+    look: {
+      luster: 'vitreous',
+      pleochroism: { alongC: '#9edc4a', acrossC: '#22c3a8' }, // yellowish-green (ω) / bluish-green (ε)
+      fluorescence: { color: '#ff3a3a', strength: 0.18 }, // weak Cr³⁺ red, quenched by iron in most stones
+      thermochromism: null,
+      inclusions: { kind: 'jardin', color: '#3c5a3a', density: 0.75 },
+      fire: 10,
+      absorptionMm: 4,
+    },
     bodyColor: (imp) => lerpColor('#e8f3ec', '#0e9a50', Math.pow(clamp01(imp), 0.85)),
     dopant: { element: 'Cr', replaces: 'Al', label: 'Cr³⁺ / V³⁺', maxLabel: '≈ 1 wt% Cr₂O₃', effect: 'Cr³⁺/V³⁺ → emerald green' },
     lattice: 'beryl',
@@ -450,6 +527,15 @@ export const GEMSTONE_PRESETS: Record<GemstoneId, GemstoneDef> = {
     substrate: 'plate',
     substrateColor: '#cdb8a2',
     optics: { ior: 1.619, dispersion: 0.014, birefringence: 0.009, density: 3.55, hardness: 8, roughness: 0.03 },
+    look: {
+      luster: 'vitreous',
+      pleochroism: { alongC: '#ffd27a', acrossC: '#ff8fa6' }, // imperial: golden / pink (biaxial, two shown)
+      fluorescence: { color: '#ff9a4a', strength: 0.12 },
+      thermochromism: null,
+      inclusions: { kind: 'cleavage', color: '#ffffff', density: 0.5 },
+      fire: 10,
+      absorptionMm: 9,
+    },
     bodyColor: (imp) => lerpColor('#f3f6fa', '#e4893a', Math.pow(clamp01(imp), 0.9)),
     dopant: { element: 'Cr', replaces: 'Al', label: 'Cr³⁺ (imperial)', maxLabel: '≈ 0.1 wt% Cr₂O₃', effect: 'Cr³⁺ → imperial orange-pink' },
     lattice: 'topaz',

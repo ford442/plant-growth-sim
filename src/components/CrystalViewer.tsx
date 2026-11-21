@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, Lightformer, Sparkles } from '@react-three/drei'
+import { Html, Lightformer } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSimStore } from '../stores/simStore'
+import { useTimeStore } from '../stores/timeStore'
 import { GEMSTONE_PRESETS, type GemstoneDef, type SubstrateKind } from '../simulation/GemstonePresets'
-import {
-  GEODE_RADIUS,
-  KIMBERLITE_CENTER,
-  KIMBERLITE_RADIUS,
-  PLATE_RADIUS,
-  specimenPolyhedron,
-  zoneColors,
-} from '../simulation/CrystalGrowth'
-import { familyLabelAnchors, polyhedronEdges, polyhedronExtents, polyhedronToMesh, type Vec3 } from '../simulation/CrystalHabit'
-import { lerpColor, mixColors } from '../simulation/color'
+import { GEODE_RADIUS, KIMBERLITE_CENTER, KIMBERLITE_RADIUS, PLATE_RADIUS, specimenPolyhedron } from '../simulation/CrystalGrowth'
+import { familyLabelAnchors, polyhedronEdges, polyhedronExtents, type Vec3 } from '../simulation/CrystalHabit'
+import { HABIT_TAU, easeHabit, gemAppearance, relaxFrost, type HabitPose } from '../simulation/GemOptics'
+import { lerpColor } from '../simulation/color'
+import { HabitGeometry } from './gem/habitGeometry'
+import { useGemMaterial } from './gem/useGemMaterial'
 import { LatticeView } from './LatticeView'
 
 export type GemViewScale = 'formation' | 'crystal' | 'lattice'
@@ -30,107 +27,42 @@ export interface GemViewOptions {
 const formationMm = (def: GemstoneDef) => 0.1 * Math.min(1.8, Math.max(1, 8 / def.kinetics.maxRadius))
 
 // ---------------------------------------------------------------------------
-// Shared hooks
+// Shared: the eased specimen, its habit mesh and its optical material
 // ---------------------------------------------------------------------------
 
-/** Volume-weighted body colour of the specimen (re-computed when zones change). */
-function useBodyColor(def: GemstoneDef): string {
-  const zones = useSimStore((s) => s.crystal.zones)
-  const peak = useSimStore((s) => Math.round(s.crystal.peakTemperature / 10) * 10)
-  // the newest zone's weight grows with the crystal: refresh every 0.25 mm
-  const rq = useSimStore((s) => Math.round(s.crystal.nuclei[0].radius * 4) / 4)
-  return useMemo(() => {
-    const crystal = useSimStore.getState().crystal
-    return mixColors(zoneColors(def, { ...crystal, zones, peakTemperature: peak }))
-  }, [def, zones, peak, rq])
-}
-
 /**
- * Keeps a BufferGeometry of the specimen habit normalised to unit equivalent
- * radius. It is rebuilt only when the face-distance ratios actually change, so
- * smooth growth is just a per-frame scale.
+ * Per-frame driver shared by the formation and crystal views. It eases the
+ * displayed specimen towards the simulation's (`easeHabit`: fast-forward steps
+ * and sudden condition changes morph instead of snapping), re-meshes the habit
+ * from that pose, and pushes `gemAppearance()` into the gem material — no React
+ * state, so colour follows each growth zone continuously as it thickens.
  */
-function useHabitGeometry(def: GemstoneDef, onRebuild?: (hn: number[]) => void) {
-  const geometry = useRef<THREE.BufferGeometry>(new THREE.BufferGeometry())
-  const lastH = useRef<number[] | null>(null)
-  const halfLength = useRef(1)
-  const halfExtent = useRef(1)
-  const target = useRef<THREE.Mesh | THREE.InstancedMesh | null>(null)
+function useSpecimen(def: GemstoneDef) {
+  const habit = useMemo(() => new HabitGeometry(def), [def])
+  useEffect(() => () => habit.dispose(), [habit])
+  const gem = useGemMaterial(def)
+  const state = useRef({ pose: null as HabitPose | null, buf: { h: [] as number[], radius: 0, age: 0 }, frost: 0 })
 
-  useEffect(() => {
-    lastH.current = null
-  }, [def])
-  useEffect(() => () => geometry.current.dispose(), [])
-
-  const update = (h: number[], radius: number) => {
-    const hn = h.map((x) => x / Math.max(radius, 1e-6))
-    const prev = lastH.current
-    if (prev && prev.length === hn.length && hn.every((x, i) => Math.abs(x - prev[i]) < 0.004)) return
-    lastH.current = hn
-    const poly = specimenPolyhedron(def, hn)
-    const mesh = polyhedronToMesh(poly)
-    const colors = new Float32Array(mesh.families.length * 3)
-    const c = new THREE.Color()
-    for (let i = 0; i < mesh.families.length; i++) {
-      c.set(def.faces[mesh.families[i]]?.color ?? '#888888')
-      colors.set([c.r, c.g, c.b], i * 3)
-    }
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3))
-    g.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    g.computeBoundingSphere()
-    const old = geometry.current
-    geometry.current = g
-    if (target.current) target.current.geometry = g
-    old.dispose()
-    const ext = polyhedronExtents(poly)
-    halfLength.current = ext.length / 2
-    halfExtent.current = Math.max(ext.length, ext.width) / 2
-    onRebuild?.(hn)
+  /** Advance one frame; returns the displayed specimen radius (mm). */
+  const step = (dt: number, faceIndexing: boolean, worldPerMm: number, thicknessOf: (radius: number) => number) => {
+    const { crystal, geology } = useSimStore.getState()
+    const st = state.current
+    const target: HabitPose = { h: crystal.h, radius: crystal.nuclei[0].radius, age: crystal.age }
+    st.pose = easeHabit(st.pose, target, dt, HABIT_TAU, st.buf)
+    const a = gemAppearance(def, crystal, geology)
+    st.frost = relaxFrost(st.frost, a.frostTarget, useTimeStore.getState().isPlaying ? dt : 0)
+    // the TSL material reads the pleochroism from `pleo`; the classic one from the vertex colours
+    habit.update(st.pose.h, st.pose.radius, faceIndexing ? { mode: 'family' } : { mode: 'pleo', alongC: a.alongC, acrossC: a.acrossC })
+    if (!faceIndexing) gem.update(a, st.frost, worldPerMm, thicknessOf(st.pose.radius))
+    return st.pose.radius
   }
 
-  const attach = (m: THREE.Mesh | THREE.InstancedMesh | null) => {
-    target.current = m
-    if (m) m.geometry = geometry.current
-  }
-
-  return { update, attach, halfLength, halfExtent, geometry }
+  return { habit, gem, step }
 }
 
-function GemMaterial({
-  def,
-  color,
-  thickness,
-  faceIndexing,
-}: {
-  def: GemstoneDef
-  color: string
-  thickness: number
-  faceIndexing: boolean
-}) {
-  if (faceIndexing) {
-    return <meshStandardMaterial vertexColors flatShading roughness={0.45} metalness={0.05} />
-  }
-  return (
-    <meshPhysicalMaterial
-      color={lerpColor('#ffffff', color, 0.55)}
-      transmission={0.96}
-      thickness={thickness}
-      ior={def.optics.ior}
-      dispersion={def.optics.dispersion * 12}
-      roughness={def.optics.roughness}
-      attenuationColor={color}
-      attenuationDistance={0.9}
-      specularIntensity={1}
-      clearcoat={0.6}
-      clearcoatRoughness={0.05}
-      envMapIntensity={2.2}
-      emissive={color}
-      emissiveIntensity={0.08}
-      flatShading
-    />
-  )
+/** Face-indexing mode: opaque, one flat colour per face family. */
+function FaceIndexMaterial() {
+  return <meshStandardMaterial vertexColors flatShading roughness={0.45} metalness={0.05} />
 }
 
 // ---------------------------------------------------------------------------
@@ -257,31 +189,31 @@ function OlivineSpecks() {
 const EMBED: Record<SubstrateKind, number> = { plate: 0.22, geode: 0.16, kimberlite: 0.35 }
 
 function FormationView({ def, faceIndexing }: { def: GemstoneDef; faceIndexing: boolean }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null)
-  const habit = useHabitGeometry(def)
-  const color = useBodyColor(def)
+  const meshRef = useRef<THREE.InstancedMesh | null>(null)
+  const { habit, gem, step } = useSpecimen(def)
   const capacity = def.kinetics.nucleation.max + 1
+  const MM = formationMm(def)
   const tmp = useMemo(
     () => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), qs: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3(), a: new THREE.Vector3(), up: new THREE.Vector3(0, 1, 0) }),
     []
   )
 
-  useFrame(() => {
+  useFrame((_, dt) => {
     const mesh = meshRef.current
     if (!mesh) return
+    // a typical crystal of the druse sets the transmission path length
+    const heroRadius = step(dt, faceIndexing, MM, (r) => Math.max(0.05, r * MM * 1.6))
     const { crystal } = useSimStore.getState()
-    habit.update(crystal.h, crystal.nuclei[0].radius)
     const embed = EMBED[def.substrate]
-    const MM = formationMm(def)
     const n = Math.min(capacity, crystal.nuclei.length)
     for (let i = 0; i < n; i++) {
       const c = crystal.nuclei[i]
-      const scale = c.radius * MM
+      const scale = (i === 0 ? heroRadius : c.radius) * MM
       tmp.a.set(c.axis[0], c.axis[1], c.axis[2])
       tmp.q.setFromUnitVectors(tmp.up, tmp.a)
       tmp.qs.setFromAxisAngle(tmp.up, c.spin)
       tmp.q.multiply(tmp.qs)
-      const lift = habit.halfLength.current * scale * (1 - 2 * embed)
+      const lift = habit.halfLength * scale * (1 - 2 * embed)
       tmp.p.set(c.pos[0] + tmp.a.x * lift, c.pos[1] + tmp.a.y * lift, c.pos[2] + tmp.a.z * lift)
       tmp.s.setScalar(scale)
       tmp.m.compose(tmp.p, tmp.q, tmp.s)
@@ -295,28 +227,64 @@ function FormationView({ def, faceIndexing }: { def: GemstoneDef; faceIndexing: 
     <group>
       <Substrate kind={def.substrate} color={def.substrateColor} />
       <instancedMesh
-        key={`${def.id}-${faceIndexing}`}
+        key={`${def.id}-${faceIndexing}-${gem.isNode}`}
         ref={(m) => {
+          habit.attach(m, meshRef.current)
           meshRef.current = m
-          habit.attach(m)
         }}
         args={[undefined, undefined, capacity]}
         castShadow
         frustumCulled={false}
       >
-        <GemMaterial def={def} color={color} thickness={0.6} faceIndexing={faceIndexing} />
+        {faceIndexing ? <FaceIndexMaterial /> : <primitive object={gem.material} attach="material" />}
       </instancedMesh>
       {/* hydrothermal fluid / melt shimmer */}
-      <Sparkles
-        count={50}
-        scale={[6, 3, 6]}
-        position={[0, 1.4, 0]}
-        size={1.6}
-        speed={0.25}
-        opacity={0.35}
-        color={def.substrate === 'kimberlite' ? '#ffb070' : '#cfe8ff'}
-      />
+      <FluidShimmer hot={def.substrate === 'kimberlite'} />
     </group>
+  )
+}
+
+const SHIMMER_COUNT = 50
+
+/**
+ * Drifting motes in the growth medium. Instanced quads with a basic material
+ * rather than drei's `<Sparkles>` (a ShaderMaterial, which WebGPURenderer
+ * cannot draw), so the formation view renders on both backends.
+ */
+function FluidShimmer({ hot }: { hot: boolean }) {
+  const ref = useRef<THREE.InstancedMesh>(null)
+  const seeds = useMemo(() => {
+    const out = new Float32Array(SHIMMER_COUNT * 4)
+    for (let i = 0; i < SHIMMER_COUNT; i++) {
+      const r = (k: number) => {
+        const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453
+        return x - Math.floor(x)
+      }
+      out.set([(r(1) - 0.5) * 6, r(2) * 3 - 0.1, (r(3) - 0.5) * 6, r(4)], i * 4)
+    }
+    return out
+  }, [])
+  const d = useMemo(() => new THREE.Object3D(), [])
+  useFrame(({ clock, camera }) => {
+    const mesh = ref.current
+    if (!mesh) return
+    const t = clock.elapsedTime * 0.25
+    for (let i = 0; i < SHIMMER_COUNT; i++) {
+      const o = i * 4
+      const ph = seeds[o + 3] * 6.283
+      d.position.set(seeds[o] + Math.sin(t + ph) * 0.15, 1.4 + seeds[o + 1] - 1.5 + ((t * 0.3 + seeds[o + 3]) % 1) * 0.6, seeds[o + 2] + Math.cos(t * 0.8 + ph) * 0.15)
+      d.quaternion.copy(camera.quaternion)
+      d.scale.setScalar(0.018 + 0.012 * (0.5 + 0.5 * Math.sin(t * 3 + ph * 2)))
+      d.updateMatrix()
+      mesh.setMatrixAt(i, d.matrix)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, SHIMMER_COUNT]} frustumCulled={false} userData={{ noExport: true }}>
+      <circleGeometry args={[1, 8]} />
+      <meshBasicMaterial color={hot ? '#ffb070' : '#cfe8ff'} transparent opacity={0.35} depthWrite={false} toneMapped={false} />
+    </instancedMesh>
   )
 }
 
@@ -369,46 +337,56 @@ function CrystalView({ def, options }: { def: GemstoneDef; options: GemViewOptio
     const ext = polyhedronExtents(specimenPolyhedron(def, st.crystal.h.map((x) => x / st.crystal.nuclei[0].radius)))
     return 1.9 / (def.kinetics.maxRadius * Math.max(ext.length, ext.width, 2.4) * 0.5)
   }, [def])
-  const color = useBodyColor(def)
-  const [thickness, setThickness] = useState(1)
-
-  const habit = useHabitGeometry(def, (hn) => {
-    const poly = specimenPolyhedron(def, hn)
-    // outline edges for crispness
-    if (edgesRef.current) {
-      edgesRef.current.geometry.dispose()
-      const g = new THREE.BufferGeometry()
-      g.setAttribute('position', new THREE.BufferAttribute(polyhedronEdges(poly), 3))
-      edgesRef.current.geometry = g
-    }
-    const anchors = familyLabelAnchors(poly)
-    setLabels([...anchors.entries()].map(([family, a]) => ({ family, pos: a.pos })))
-  })
+  const { habit, gem, step } = useSpecimen(def)
+  const seen = useRef(-1)
 
   useFrame((_, dt) => {
-    const { crystal } = useSimStore.getState()
-    const r = crystal.nuclei[0].radius
-    habit.update(crystal.h, r)
+    const r = step(dt, options.faceIndexing, worldPerMm, (radius) => Math.max(radius * worldPerMm, 0.02) * 2)
     const s = Math.max(r * worldPerMm, 0.02)
     meshRef.current?.scale.setScalar(s)
     edgesRef.current?.scale.setScalar(s * 1.001)
     if (turntable.current) turntable.current.rotation.y += dt * 0.18
-    const t = Math.round(s * 2 * 10) / 10
-    if (t !== thickness) setThickness(t)
+    if (habit.version !== seen.current && habit.poly) {
+      seen.current = habit.version
+      // outline edges for crispness
+      if (edgesRef.current) {
+        const pos = polyhedronEdges(habit.poly)
+        const g = edgesRef.current.geometry
+        const attr = g.getAttribute('position') as THREE.BufferAttribute | undefined
+        if (attr && attr.array.length === pos.length) {
+          ;(attr.array as Float32Array).set(pos)
+          attr.needsUpdate = true
+        } else {
+          g.dispose()
+          const ng = new THREE.BufferGeometry()
+          ng.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+          edgesRef.current.geometry = ng
+        }
+      }
+      // labels only need to follow face appearance / disappearance
+      if (options.faceIndexing) {
+        const next = [...familyLabelAnchors(habit.poly).entries()].map(([family, a]) => ({ family, pos: a.pos }))
+        setLabels((prev) =>
+          prev.length === next.length && prev.every((l, i) => l.family === next[i].family && Math.hypot(l.pos[0] - next[i].pos[0], l.pos[1] - next[i].pos[1], l.pos[2] - next[i].pos[2]) < 0.02)
+            ? prev
+            : next
+        )
+      }
+    }
   })
 
   return (
     <group>
       <group ref={turntable} position={[0, CRYSTAL_Y, 0]}>
         <mesh
-          key={`${def.id}-${options.faceIndexing}`}
+          key={`${def.id}-${options.faceIndexing}-${gem.isNode}`}
           ref={(m) => {
+            habit.attach(m, meshRef.current)
             meshRef.current = m
-            habit.attach(m)
           }}
           castShadow
         >
-          <GemMaterial def={def} color={color} thickness={thickness} faceIndexing={options.faceIndexing} />
+          {options.faceIndexing ? <FaceIndexMaterial /> : <primitive object={gem.material} attach="material" />}
         </mesh>
         <lineSegments ref={edgesRef}>
           <lineBasicMaterial color={options.faceIndexing ? '#0b0b12' : '#ffffff'} transparent opacity={options.faceIndexing ? 0.9 : 0.18} />

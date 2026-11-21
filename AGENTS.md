@@ -58,7 +58,10 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/simulation/CrystalHabit.ts` — Miller indices → face poles under point-group symmetry; kinetic Wulff polyhedron (half-space clipping), volume/areas/extents
 - `src/simulation/CrystalGrowth.ts` — `CrystalState` + pure `stepCrystal()` (Arrhenius × BCF growth law, nucleation, size cap, growth zones)
 - `src/simulation/CrystalLattice.ts` — real unit cells from space-group generators, slab + bonds, growth-front arrival times, frozen-in defects
-- `src/components/CrystalViewer.tsx` (formation / crystal views) + `LatticeView.tsx` (atomic lattice)
+- `src/simulation/GemOptics.ts` — pure, tested (`GemOptics.test.ts`, which also pins the cubic / hexagonal / trigonal / orthorhombic habits): `gemAppearance()` = preset `look` + growth zones + current T → body colour, pleochroic colours along / across c, Beer–Lambert distance, fluorescence, thermochromism, incandescence (blackbody), inclusion load (fast growth traps inclusions), etch-frost target. Also the smooth-growth helpers `easeHabit` (display pose eases toward the sim's face distances; a convex blend of two Wulff vectors is always a valid habit) and `relaxFrost`
+- `GemstoneDef.look` (`GemLook`) — per-gem optical identity: luster, pleochroism tints, fluorescence, thermochromism, inclusion scene (`veils` / `zoning` / `pinpoint` / `silk` / `jardin` / `cleavage`), fire, absorption length
+- `src/components/CrystalViewer.tsx` (formation / crystal views; `useSpecimen` is the per-frame driver: ease → re-mesh → appearance → material) + `LatticeView.tsx` (atomic lattice)
+- `src/components/gem/habitGeometry.ts` (`HabitGeometry`: unit-radius habit mesh rewritten in place, `pleo` = |n·c| attribute, vertex colours = face-indexing colours or the pleochroic tint), `gem/useGemMaterial.ts` (classic `MeshPhysicalMaterial` driven per frame; swaps in the TSL one on a node renderer), `gem/tsl/gemNodeMaterial.ts` (`MeshPhysicalNodeMaterial` + procedural inclusions in `positionGeometry`, fluorescence / glow emissive, frost roughness, cleavage iridescence; **dynamic `import()` only**)
 - `src/components/GeologyPanel.tsx` + `PhaseDiagram.tsx` + `GemInfoPanel.tsx` — gem UI
 
 ## Conventions
@@ -77,7 +80,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - 4 view modes (macro / architecture / cellular / roots); cellular is a real stem cross-section with animated mitosis, expansion and growth rings; roots is a soil slice with water, minerals, cement, nodules and the root system, plus animated water particles running soil → root → stem (density = uptake flux)
 - Soil mineral field (`SoilField.ts`, 3 soils) under the plant: rain reaches the plant only through it; minerals feed back via calcium nutrition and hardpans; geodes / rhizoliths form around roots
 - 6 species presets
-- Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls
+- Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls; per-gem optics (pleochroism, fluorescence, heat glow, inclusions, etch frost) on both renderers, TSL gem material under `?renderer=webgpu`; habit eases smoothly between growth states
 - Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. 51 unit tests (`npm test`)
 
 ## Next High-Value Tasks
@@ -101,7 +104,7 @@ npm test
 ```
 
 ### Gem follow-ups
-- TSL optical materials (IOR/dispersion/colour vs T) once the WebGPU path lands (#15, #19) — currently `MeshPhysicalMaterial`
+- ~~TSL optical materials (IOR/dispersion/colour vs T)~~ (done, #15: `GemOptics.ts` + `gem/tsl/gemNodeMaterial.ts`; gem mode is in `NODE_READY_MODES`). Next: true per-ray pleochroism (view direction vs c, needs the instance matrix in the shader), internal colour zoning seen *through* the stone (zone shells, not just surface bands), asterism for silk rubies, tune on a real WebGPU device
 - ~~Mineral–root co-evolution~~ (done: `SoilField.ts` + Roots view). Next: share the substrate with the parasite oocyst field; carry a soil geode's own conditions into the gem crystal instead of the amethyst defaults
 
 ## Notes for Agents
@@ -119,6 +122,7 @@ npm test
 - When adding species, update `SpeciesId`, `SPECIES_LSYSTEMS`, `SPECIES_TISSUE` and `SPECIES_ROOTS` (typed on `SpeciesId`, so a missing entry is a compile error)
 - The tissue sim is pure and unit-tested (`TissueGrowth.test.ts`, including a deep-frozen-state purity test) — run `npm test` after touching it; keep new tissue behaviour in `stepTissue` and keep drawing code out of the simulation
 - When adding a gemstone, extend `GemstoneId` and `GEMSTONE_PRESETS`; add a structure to `STRUCTURES` in `CrystalLattice.ts` if it needs a new lattice, and check atom counts / bond lengths against literature
+- Gem looks: put optical identity in `GemstoneDef.look` and derive from it in `gemAppearance()` (pure), never in the material. The classic and TSL materials must both read the same `GemAppearance`; only the inclusion scene is TSL-only. The displayed specimen is eased (`easeHabit`), the sim's `crystal.h` is not — do not ease inside `stepCrystal`
 - Growth rates are tuned to lab-synthesis scale (~0.1–1 mm/day) so they are watchable; stability fields are simplified curves
 - The soil sim is pure and unit-tested (`SoilField.test.ts`, plus coupling tests in `simStore.test.ts`) — run `npm test` after touching it. Plant water comes *only* through the soil now: `waterStatus` relaxes towards `soil.supply` (uptake ÷ transpiration demand), and growth rate is temp × light × water × `nutrientStatus`. Do not add a direct rain → waterStatus shortcut again
 - Soil units: `water` is a fraction of a cell's original pore space (≤ 1 − cement); solutes are stored as amounts (concentration × water) so drying concentrates them; saturation S = c / c_eq. A hardpan (cement ≥ `HARDPAN`) stops roots that have not reached it (`rootReach` per column) — one forming around established roots does not cut them off

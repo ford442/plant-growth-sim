@@ -1,4 +1,5 @@
 import type { ActiveRenderer, RendererBackend } from '../rendering'
+import { useModeStore } from '../stores/modeStore'
 import { useRendererStore } from '../stores/rendererStore'
 
 /** What is drawing — the renderer only; whether the leaf shader chunk loaded is a separate matter. */
@@ -12,14 +13,15 @@ function statusLine(active: ActiveRenderer | null, preference: RendererBackend):
 }
 
 /**
- * Opt-in switch for the experimental WebGPU/TSL renderer (plant mode only —
- * the other modes are not node-ready, see `NODE_READY_MODES`). Switching
+ * Opt-in switch for the experimental WebGPU/TSL renderer (plant and gem modes —
+ * parasite is not node-ready yet, see `NODE_READY_MODES`). Switching
  * remounts the Canvas; simulation state lives in the stores and is untouched.
  */
 export function RendererPanel() {
   const preference = useRendererStore((s) => s.preference)
   const active = useRendererStore((s) => s.active)
   const setPreference = useRendererStore((s) => s.setPreference)
+  const mode = useModeStore((s) => s.mode)
 
   return (
     <div className="panel renderer-panel">
@@ -48,8 +50,9 @@ export function RendererPanel() {
         {statusLine(active, preference)}
       </p>
       <p className="small muted">
-        The WebGPU option shades leaves with a TSL material: translucency, chlorophyll, rain wetness and wind
-        flutter.
+        {mode === 'gem'
+          ? 'The WebGPU option shades gems with a TSL material: inclusions (silk, jardin, veils, cleavage…), pleochroism, fluorescence, heat glow and etch frost.'
+          : 'The WebGPU option shades leaves with a TSL material: translucency, chlorophyll, rain wetness and wind flutter.'}
       </p>
     </div>
   )
