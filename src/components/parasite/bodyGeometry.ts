@@ -15,7 +15,7 @@
 import * as THREE from 'three'
 
 /** Radial profile of the body at `t` (0 = apex, 1 = posterior). */
-function bodyRadius(t: number, halfWidth: number): number {
+export function bodyRadius(t: number, halfWidth: number): number {
   // pointed apex over the first fifth
   const apex = Math.min(1, (t / 0.22) ** 0.65)
   // rounded posterior cap

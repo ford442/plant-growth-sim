@@ -29,10 +29,13 @@ import {
   PARASITE_VIEW_TARGET,
   type ParasiteViewScale,
 } from './components/ParasiteViewer'
+import { LyticPanel, LyticTimeline } from './components/parasite/LyticPanels'
 import { useSimStore } from './stores/simStore'
 import { useModeStore } from './stores/modeStore'
 import { useTimeStore } from './stores/timeStore'
 import { useParasiteStore } from './stores/parasiteStore'
+import { useLyticStore } from './stores/lyticStore'
+import { LYTIC_PHASE_DEFS, lyticSettled } from './simulation/parasite/lytic/sandbox'
 import { useRendererStore } from './stores/rendererStore'
 import { RendererPanel } from './components/RendererPanel'
 import { RendererLifecycle, backendForMode, rendererFactory, useGraphicsCapability } from './rendering'
@@ -181,11 +184,14 @@ function App() {
           )}
 
           {isParasite && <ParasiteViewportHint scale={parasiteScale} />}
+          {isParasite && parasiteScale === 'sandbox' && <LyticTimeline />}
           {!isParasite && !isGem && scale === 'cellular' && <TissueHud />}
 
           {/* Overlay HUD */}
           <div className="hud">
-            {isParasite ? (
+            {isParasite && parasiteScale === 'sandbox' ? (
+              <LyticHud isPlaying={isPlaying} />
+            ) : isParasite ? (
               <ParasiteHud scale={parasiteScale} isPlaying={isPlaying} />
             ) : (
               <>
@@ -217,7 +223,9 @@ function App() {
         {/* Side panels */}
         <aside className="sidebar">
           <SimControls />
-          {isParasite ? (
+          {isParasite && parasiteScale === 'sandbox' ? (
+            <LyticPanel />
+          ) : isParasite ? (
             <>
               <ObjectivePanel />
               <HostPanel />
@@ -285,6 +293,40 @@ function ParasiteHud({ scale, isPlaying }: { scale: ParasiteViewScale; isPlaying
         <span className="label">Sim</span>
         <span className={`value ${isPlaying && status === 'active' ? 'playing' : ''}`}>
           {status === 'won' ? 'OBJECTIVE MET' : status === 'lost' ? 'RUN OVER' : isPlaying ? 'RUNNING' : 'PAUSED'}
+        </span>
+      </div>
+    </>
+  )
+}
+
+/** HUD for the lytic sandbox: only values that change rarely, so it re-renders rarely. */
+function LyticHud({ isPlaying }: { isPlaying: boolean }) {
+  const phase = useLyticStore((s) => s.lytic.phase)
+  const seed = useLyticStore((s) => s.seed)
+  const parasites = useLyticStore((s) => s.lytic.pv?.parasites ?? 1)
+  const settled = useLyticStore((s) => lyticSettled(s.lytic))
+  return (
+    <>
+      <div className="hud-item">
+        <span className="label">View</span>
+        <span className="value">lytic sandbox</span>
+      </div>
+      <div className="hud-item">
+        <span className="label">Phase</span>
+        <span className="value">{LYTIC_PHASE_DEFS[phase].name}</span>
+      </div>
+      <div className="hud-item">
+        <span className="label">Tachyzoites</span>
+        <span className="value">{parasites}</span>
+      </div>
+      <div className="hud-item">
+        <span className="label">Seed</span>
+        <span className="value">{seed}</span>
+      </div>
+      <div className="hud-item">
+        <span className="label">Sim</span>
+        <span className={`value ${isPlaying && !settled ? 'playing' : ''}`}>
+          {settled ? 'LOOP DONE' : isPlaying ? 'RUNNING' : 'PAUSED'}
         </span>
       </div>
     </>

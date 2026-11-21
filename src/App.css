@@ -1031,3 +1031,52 @@
 .soil-toggle input { accent-color: #4ade80; }
 .soil-water-dot { background: #33a8ff; box-shadow: 0 0 6px #7fcaff; }
 .soil-callout.flow { color: #8fdcff; }
+
+/* ------------------------------------------------------------------------ */
+/* Parasite lytic sandbox: timeline strip                                   */
+/* ------------------------------------------------------------------------ */
+.lytic-hud {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.9rem;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  background: rgba(7, 16, 20, 0.86);
+  border: 1px solid #1b3741;
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.lytic-steps { display: flex; gap: 0.25rem; }
+.lytic-step {
+  flex: 1;
+  text-align: center;
+  font-size: 0.64rem;
+  padding: 0.22rem 0.2rem;
+  border-radius: 4px;
+  background: #081317;
+  border: 1px solid #1b3741;
+  color: #5f868c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lytic-step.done { color: #93d8ca; border-color: #24525a; }
+.lytic-step.active { background: #15323a; border-color: var(--accent); color: var(--accent); }
+.lytic-step.failed { background: #3a1717; border-color: #f87171; color: #fca5a5; }
+.lytic-bar { height: 3px; background: #0d2228; border-radius: 2px; overflow: hidden; }
+.lytic-bar-fill { height: 100%; background: var(--accent); transition: width 0.2s linear; }
+.lytic-bar-fill.failed { background: #f87171; }
+.lytic-detail { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.68rem; color: #c3e9e2; }
+.lytic-detail span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lytic-detail .muted { flex-shrink: 0; }
+@media (max-width: 700px) {
+  .lytic-steps { flex-wrap: wrap; }
+  .lytic-step { flex: 0 0 calc(25% - 0.2rem); }
+  .lytic-detail { flex-direction: column; gap: 0.15rem; }
+}

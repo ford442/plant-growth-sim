@@ -53,8 +53,8 @@ const STROKE_END = 0.86
  * (sin θ / ω ≈ 0.7 µm here, matching the sub-micron amplitude of real helical
  * gliding).
  */
-const HELIX_TWIST = 0.6 // rad per µm of path
-const HELIX_PITCH = 0.42 // rad between heading and helix axis
+export const HELIX_TWIST = 0.6 // rad per µm of path
+export const HELIX_PITCH = 0.42 // rad between heading and helix axis
 const BODY_ROLL = 0.9 // rad per µm, the parasite's own spin about its long axis
 
 /** Adhesion below this and the ring slips instead of gripping. */
@@ -129,8 +129,12 @@ export interface GlideInputs {
   biasStrength?: number
 }
 
-/** Fraction of the cycle spent gripping, and the force profile within it. */
-function strokeProfile(phase: number): number {
+/**
+ * Fraction of the cycle spent gripping, and the force profile within it, 0–1.
+ * Exported so other kinematics (the lytic sandbox's substrate glide) share the
+ * same stop-start velocity profile instead of re-deriving it.
+ */
+export function strokeProfile(phase: number): number {
   if (phase < STROKE_START || phase > STROKE_END) return 0
   const t = (phase - STROKE_START) / (STROKE_END - STROKE_START)
   // smooth rise and fall: traction builds as the ring engages and fades as it

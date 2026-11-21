@@ -26,6 +26,7 @@ export const PARASITE_TABS: TabDef<ParasiteViewScale>[] = [
   { id: 'tissue', label: 'Tissue', icon: '🫀' },
   { id: 'cell', label: 'Cell / PV', icon: '🔬' },
   { id: 'organelle', label: 'Organelle', icon: '🧫' },
+  { id: 'sandbox', label: 'Lytic cycle', icon: '🔁' },
 ]
 
 interface Props<T extends string> {
