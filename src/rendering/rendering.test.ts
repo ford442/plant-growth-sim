@@ -30,6 +30,10 @@ describe('renderer preference', () => {
   it('only node-ready modes honour the WebGPU preference', () => {
     expect(backendForMode('plant', 'webgpu')).toBe(NODE_READY_MODES.plant ? 'webgpu' : 'webgl')
     expect(backendForMode('plant', 'webgl')).toBe('webgl')
+    // gem mode was walked on the node renderer (TSL gem material, docs/design/webgpu-tsl.md §8)
+    expect(NODE_READY_MODES.gem).toBe(true)
+    expect(backendForMode('gem', 'webgpu')).toBe('webgpu')
+    expect(backendForMode('gem', 'webgl')).toBe('webgl')
     // modes that have not been ported stay on WebGL whatever was asked for
     for (const mode of ['gem', 'parasite'] as const) {
       if (!NODE_READY_MODES[mode]) expect(backendForMode(mode, 'webgpu')).toBe('webgl')

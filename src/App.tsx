@@ -81,6 +81,9 @@ function App() {
   // WebGL unless the user opted in *and* this mode is node/TSL-ready (see rendererPreference.ts)
   const rendererPreference = useRendererStore((s) => s.preference)
   const setActiveRenderer = useRendererStore((s) => s.setActive)
+  // drei's Environment children render through a cube camera that the node renderer's WebGL2
+  // backend rejects (GL_INVALID_OPERATION); the gem softboxes stay on the classic renderer only
+  const classicRenderer = useRendererStore((s) => s.active) === 'webgl'
   const backend = backendForMode(mode, rendererPreference)
   // bumping the key remounts the Canvas with a fresh renderer after device loss
   const [canvasKey, setCanvasKey] = useState(0)
@@ -171,7 +174,7 @@ function App() {
               dampingFactor={0.08}
             />
             {!isParasite && (
-              <Environment preset={isGem ? 'city' : 'forest'}>{isGem && <GemLightformers />}</Environment>
+              <Environment preset={isGem ? 'city' : 'forest'}>{isGem && classicRenderer && <GemLightformers />}</Environment>
             )}
             {import.meta.env.DEV && <Stats />}
           </Canvas>
@@ -224,6 +227,7 @@ function App() {
             <>
               <GeologyPanel />
               <GemInfoPanel scale={gemScale} options={gemOptions} onOptions={setGemOptions} />
+              <RendererPanel />
             </>
           ) : (
             <>

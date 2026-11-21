@@ -19,7 +19,7 @@ export const RENDERER_PARAM = 'renderer'
  */
 export const NODE_READY_MODES: Record<SimMode, boolean> = {
   plant: true,
-  gem: false, // physical/transmission materials + lightformers not yet checked
+  gem: true, // walked: formation / crystal / lattice, face indexing, all six gems (webgpu-tsl.md §8)
   parasite: false, // not yet checked
 }
 

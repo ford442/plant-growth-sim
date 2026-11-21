@@ -74,7 +74,7 @@ export class MorphedPlant {
    * rises — so re-posing stays free of it.
    */
   get top(): number {
-    const a = this.positions.array as Float32Array
+    const a = this.segmentPose // segment start/end points, xyz each
     let top = 0
     for (let i = 1; i < a.length; i += 3) if (a[i] > top) top = a[i]
     return top
