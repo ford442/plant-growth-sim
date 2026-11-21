@@ -16,6 +16,8 @@ interface Props {
   scale: ViewScale
   /** Field shown on the soil slice in the Roots view. */
   soilOverlay?: SoilOverlay
+  /** Animate water moving soil → root → stem in the Roots view. */
+  soilFlow?: boolean
 }
 
 /** Orbit target per plant view: the Roots view looks into the soil. */
@@ -140,7 +142,7 @@ function ArchitectureView({ ground = true }: { ground?: boolean }) {
 }
 
 /** The plant above ground and the soil slice it draws on below. */
-function RootsView({ overlay }: { overlay: SoilOverlay }) {
+function RootsView({ overlay, flow }: { overlay: SoilOverlay; flow: boolean }) {
   // look at the slice face-on (the default camera looks down on the plant);
   // put the camera back on the way out so the other views keep their framing
   const camera = useThree((s) => s.camera)
@@ -155,7 +157,7 @@ function RootsView({ overlay }: { overlay: SoilOverlay }) {
   return (
     <group>
       <ArchitectureView ground={false} />
-      <SoilView overlay={overlay} />
+      <SoilView overlay={overlay} flow={flow} />
     </group>
   )
 }
@@ -177,14 +179,14 @@ function MacroView() {
 }
 
 // The simulation tick lives in <SimClock /> (shared with the gem viewer).
-export function PlantViewer({ scale, soilOverlay = 'moisture' }: Props) {
+export function PlantViewer({ scale, soilOverlay = 'moisture', soilFlow = true }: Props) {
   // Root group is registered so the UI can export the on-screen scene as GLB.
   return (
     <group ref={registerPlantRoot} name="plant-scene">
       {scale === 'macro' && <MacroView />}
       {scale === 'architecture' && <ArchitectureView />}
       {scale === 'cellular' && <CellularView />}
-      {scale === 'roots' && <RootsView overlay={soilOverlay} />}
+      {scale === 'roots' && <RootsView overlay={soilOverlay} flow={soilFlow} />}
     </group>
   )
 }

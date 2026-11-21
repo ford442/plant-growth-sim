@@ -325,6 +325,13 @@ export interface SoilState {
   // last-step diagnostics, mm/day per m² of ground
   demand: number // transpiration demand under the canopy
   uptake: number // root water uptake under the canopy
+  /**
+   * Per cell: water the roots drew from it over the last step, mm/day over the
+   * cell's own footprint. The sink map of the root zone — it sums to
+   * `uptake` × the canopy width in columns, and it is what the Roots view's
+   * water flow animates (a particle leaves each cell in proportion to it).
+   */
+  uptakeField: number[]
   evaporation: number // bare-surface evaporation, slice mean
   drainage: number // deep drainage out of the slice, slice mean
   supply: number // 0–1 water uptake ÷ demand
@@ -402,6 +409,7 @@ export function createSoilState(
     rng: seed >>> 0,
     demand: 0,
     uptake: 0,
+    uptakeField: zeros(),
     evaporation: 0,
     drainage: 0,
     supply: 1,
@@ -523,6 +531,7 @@ export function stepSoil(
   let canopy = 1 // canopy width in columns (for per-area diagnostics)
   let sumDemand = 0
   let sumUptake = 0
+  const cellUptake = new Array<number>(SOIL_CELLS).fill(0) // mm drawn from each cell over the step
   let sumEvap = 0
   let sumDrain = 0
   let supply = state.supply
@@ -662,6 +671,7 @@ export function stepSoil(
         calcium[i] = Math.max(0, calcium[i] - CA_UPTAKE * take * cCa)
         silica[i] = Math.max(0, silica[i] - SI_UPTAKE * take * cSi)
         sumUptake += take * poreMM
+        cellUptake[i] += take * poreMM
       }
     }
     sumDemand += demand * dt
@@ -816,6 +826,7 @@ export function stepSoil(
     rng,
     demand: sumDemand / days / canopy,
     uptake: sumUptake / days / canopy,
+    uptakeField: cellUptake.map((mm) => mm / days),
     evaporation: sumEvap / days / SOIL_COLS,
     drainage: sumDrain / days / SOIL_COLS,
     supply,

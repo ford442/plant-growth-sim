@@ -14,7 +14,6 @@ import {
   largestGeode,
   MAX_NODULES,
   noduleLabel,
-  rootSpread,
   rootSystem,
   SOIL_CELLS,
   SOIL_COLS,
@@ -24,8 +23,9 @@ import {
   type SoilMineral,
   type SoilState,
 } from '../../simulation/SoilField'
-import { MINERAL_HEX, overlayColor, saturationParam, type SoilOverlay } from './palette'
-import { rootSkeleton } from './rootSkeleton'
+import { MINERAL_HEX, overlayColor, saturationParam, uptakeParam, type SoilOverlay } from './palette'
+import { RootPose, rootSkeleton } from './rootSkeleton'
+import { WaterFlowLayer } from './WaterFlowLayer'
 
 /**
  * The Roots view's soil: a vertical slice under the plant, one tile per soil
@@ -51,6 +51,8 @@ function cellValue(s: SoilState, overlay: SoilOverlay, i: number, act: number): 
   switch (overlay) {
     case 'moisture':
       return cellMoisture(s, i)
+    case 'uptake':
+      return uptakeParam(s.uptakeField[i])
     case 'silica':
       return saturationParam(cellSaturation(s, i, 'silica', act))
     case 'calcite':
@@ -104,10 +106,8 @@ function SoilTiles({ overlay }: { overlay: SoilOverlay }) {
   )
 }
 
-function RootLines() {
-  const species = useSimStore((s) => s.species)
-  const def = rootSystem(species)
-  const skeleton = useMemo(() => rootSkeleton(def, species.length), [def, species])
+function RootLines({ pose }: { pose: RootPose }) {
+  const { skeleton } = pose
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(skeleton.length * 6), 3))
@@ -116,39 +116,24 @@ function RootLines() {
   }, [skeleton])
   useEffect(() => () => geometry.dispose(), [geometry])
   const clock = useRef(REFRESH)
-  const last = useRef('')
+  const seen = useRef(-1)
 
   useFrame((_, dt) => {
     clock.current += dt
     if (clock.current < REFRESH) return
     clock.current = 0
-    const s = useSimStore.getState().soil
-    const key = `${s.rootDepth.toFixed(3)}|${s.rootFront.map((f) => f.toFixed(2)).join(',')}`
-    if (key === last.current) return
-    last.current = key
+    // scaled to the root front and clipped at the same hardpans the sim stops roots at
+    const posed = pose.update(useSimStore.getState().soil)
+    if (seen.current === pose.version) return
+    seen.current = pose.version
 
-    const sz = Math.min(1, s.rootDepth / def.maxDepth)
-    const sx = rootSpread(def, s.rootDepth) / rootSpread(def, def.maxDepth)
-    // per-column root front from the sim: the drawn roots stop at the same hardpans
-    const front = (x: number) => s.rootFront[Math.max(0, Math.min(SOIL_COLS - 1, Math.floor((x + SOIL_WIDTH / 2) / CELL_W)))]
     const pos = geometry.attributes.position as THREE.BufferAttribute
     const arr = pos.array as Float32Array
     let n = 0
-    for (const seg of skeleton) {
-      const x0 = seg.x0 * sx
-      const x1 = seg.x1 * sx
-      const z0 = seg.z0 * sz
-      let z1 = seg.z1 * sz
-      const f = front(x0)
-      if (z0 > f) continue
-      let xe = x1
-      if (z1 > f) {
-        const t = (f - z0) / Math.max(1e-6, z1 - z0)
-        xe = x0 + (x1 - x0) * t
-        z1 = f
-      }
-      const zf = FRONT + 0.012 + seg.order * 0.004
-      arr.set([x0, -z0, zf, xe, -z1, zf], n * 6)
+    for (let i = 0; i < skeleton.length; i++) {
+      if (!posed.visible[i]) continue
+      const zf = FRONT + 0.012 + skeleton[i].order * 0.004
+      arr.set([posed.x0[i], -posed.z0[i], zf, posed.x1[i], -posed.z1[i], zf], n * 6)
       n++
     }
     geometry.setDrawRange(0, n * 2)
@@ -160,6 +145,19 @@ function RootLines() {
     <lineSegments geometry={geometry} frustumCulled={false}>
       <lineBasicMaterial color={MINERAL_HEX.root} transparent opacity={0.9} />
     </lineSegments>
+  )
+}
+
+/** The root system (drawn) and the water moving through it, on one shared pose. */
+function RootSystem({ flow }: { flow: boolean }) {
+  const species = useSimStore((s) => s.species)
+  const def = rootSystem(species)
+  const pose = useMemo(() => new RootPose(rootSkeleton(def, species.length), def), [def, species])
+  return (
+    <>
+      <RootLines pose={pose} />
+      {flow && <WaterFlowLayer pose={pose} />}
+    </>
   )
 }
 
@@ -231,7 +229,7 @@ function SoilLabels() {
   )
 }
 
-export function SoilView({ overlay }: { overlay: SoilOverlay }) {
+export function SoilView({ overlay, flow = true }: { overlay: SoilOverlay; flow?: boolean }) {
   return (
     <group>
       {/* dark backing so the gaps between tiles read as a grid */}
@@ -240,7 +238,7 @@ export function SoilView({ overlay }: { overlay: SoilOverlay }) {
         <meshBasicMaterial color="#0b0906" />
       </mesh>
       <SoilTiles overlay={overlay} />
-      <RootLines />
+      <RootSystem flow={flow} />
       <NoduleLayer mineral="silica" />
       <NoduleLayer mineral="calcite" />
       <SoilLabels />

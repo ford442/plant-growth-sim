@@ -1027,3 +1027,7 @@
 }
 .soil-callout.hardpan { color: #e9dfc9; }
 .soil-callout.geode { color: #c9b6ff; }
+.soil-toggle { display: flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; color: #a9d2a9; cursor: pointer; }
+.soil-toggle input { accent-color: #4ade80; }
+.soil-water-dot { background: #33a8ff; box-shadow: 0 0 6px #7fcaff; }
+.soil-callout.flow { color: #8fdcff; }

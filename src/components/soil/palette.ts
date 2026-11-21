@@ -5,7 +5,7 @@ import { clamp01, lerpColor, rampColor } from '../../simulation/color'
  * sidebar legend. Every overlay also whitens cemented cells, so a hardpan is
  * visible whichever field is showing.
  */
-export type SoilOverlay = 'moisture' | 'silica' | 'calcite' | 'cement' | 'roots'
+export type SoilOverlay = 'moisture' | 'uptake' | 'silica' | 'calcite' | 'cement' | 'roots'
 
 export interface OverlayDef {
   label: string
@@ -27,6 +27,17 @@ export const OVERLAYS: Record<SoilOverlay, OverlayDef> = {
     ],
     ticks: ['dry', 'field capacity', 'saturated'],
     hint: 'Pore water as a share of the open pore space. Roots cannot pull water below ~16 %.',
+  },
+  uptake: {
+    label: 'Uptake',
+    stops: [
+      [0, '#211a12'],
+      [0.2, '#16323f'],
+      [0.5, '#1f7fae'],
+      [1, '#9ee7ff'],
+    ],
+    ticks: ['none', '', 'strongest sink'],
+    hint: 'Water the roots drew from each cell today. Wet soil with dense roots is the sink; once the surface dries the draw moves down to the wetter soil beneath.',
   },
   silica: {
     label: 'Silica S',
@@ -76,6 +87,10 @@ export const OVERLAYS: Record<SoilOverlay, OverlayDef> = {
 }
 
 export const SOIL_OVERLAY_IDS = Object.keys(OVERLAYS) as SoilOverlay[]
+
+/** Uptake (mm/day from one cell) is mapped square-root, so weak lateral sinks still show next to the taproot's. */
+export const UPTAKE_FULL = 1.5
+export const uptakeParam = (mmPerDay: number) => clamp01(Math.sqrt(Math.max(0, mmPerDay) / UPTAKE_FULL))
 
 /** Saturation indices are mapped so S = 1 sits at 0.6 of the ramp. */
 export const saturationParam = (S: number) => clamp01(S / 1.7)

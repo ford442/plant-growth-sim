@@ -70,6 +70,7 @@ function App() {
   const [parasiteScale, setParasiteScale] = useState<ParasiteViewScale>('tissue')
   const [gemOptions, setGemOptions] = useState<GemViewOptions>({ faceIndexing: false, phantoms: true })
   const [soilOverlay, setSoilOverlay] = useState<SoilOverlay>('moisture')
+  const [soilFlow, setSoilFlow] = useState(true)
   const mode = useModeStore((s) => s.mode)
   const species = useSimStore((s) => s.species)
   const soilProfile = useSimStore((s) => s.soilProfile)
@@ -151,7 +152,7 @@ function App() {
             ) : isGem ? (
               <CrystalViewer scale={gemScale} options={gemOptions} />
             ) : (
-              <PlantViewer scale={scale} soilOverlay={soilOverlay} />
+              <PlantViewer scale={scale} soilOverlay={soilOverlay} soilFlow={soilFlow} />
             )}
 
             <OrbitControls
@@ -229,7 +230,7 @@ function App() {
               <WeatherPanel />
               <RendererPanel />
               {scale === 'cellular' && <TissuePanel />}
-              {scale === 'roots' && <SoilPanel overlay={soilOverlay} onOverlay={setSoilOverlay} />}
+              {scale === 'roots' && <SoilPanel overlay={soilOverlay} onOverlay={setSoilOverlay} flow={soilFlow} onFlow={setSoilFlow} />}
             </>
           )}
         </aside>

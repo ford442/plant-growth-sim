@@ -62,6 +62,19 @@ export class MorphedPlant {
     this.leafPose = new Float32Array(morph.leafCount * LEAF_STRIDE)
   }
 
+  /**
+   * Height of the highest branch vertex in the current pose, in the plant's
+   * own units (before the view's growth scale). Scanned on demand — the Roots
+   * view reads it a few times a second to know how far up the stem its water
+   * rises — so re-posing stays free of it.
+   */
+  get top(): number {
+    const a = this.positions.array as Float32Array
+    let top = 0
+    for (let i = 1; i < a.length; i += 3) if (a[i] > top) top = a[i]
+    return top
+  }
+
   /** Pose the plant `t ∈ [0, 1]` of the way from `stage` to `stage + 1`. */
   setMorph(t: number): void {
     const k = this.morph.isStatic ? 0 : Math.min(1, Math.max(0, t))
