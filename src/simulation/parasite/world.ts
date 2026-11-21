@@ -398,8 +398,18 @@ function logEvent(s: StepScratch, hour: number, kind: EventKind, text: string) {
 }
 
 /**
- * One simulation step. `clocks` comes from `advanceClocks(dt, speed)`, so the
- * caller owns the shared play/pause and speed.
+ * The world's random generator, copied. `nextFloat` advances an `Rng` in place,
+ * so a step that drew from `world.rng` directly would change the world it was
+ * given and answer differently the second time it was called. Every function
+ * that takes a world and returns one draws from its own fork and hands that
+ * back, which leaves the draw sequence of a linear run exactly as it was.
+ */
+const forkRng = (world: ParasiteWorld): Rng => ({ ...world.rng })
+
+/**
+ * One simulation step. Pure: `world` is never modified, and the same
+ * `(world, cfg, clocks)` always gives the same result. `clocks` comes from
+ * `advanceClocks(dt, speed)`, so the caller owns the shared play/pause and speed.
  */
 export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clocks): ParasiteWorld {
   const mods = resolveModifiers(cfg.species, cfg.modifiers)
@@ -407,7 +417,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
   const dtH = clocks.lesion
   if (dtA <= 0 && dtH <= 0) return world
 
-  const rng = world.rng
+  const rng = forkRng(world)
   const scratch: StepScratch = {
     log: world.log.slice(),
     nextId: world.nextId,
@@ -442,6 +452,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
     }
     return {
       ...world,
+      rng,
       lesionHours,
       actionSeconds: world.actionSeconds + dtA,
       oocysts,
@@ -976,7 +987,7 @@ export const CARNIVORY_MIN_CYSTS = 1
  */
 export function enterFelidGut(world: ParasiteWorld, cfg: ParasiteConfig): ParasiteWorld {
   const inoculum = Math.min(8, Math.max(1, world.cysts.filter((c) => c.intact).length))
-  const rng = world.rng
+  const rng = forkRng(world)
   const cells: HostCell[] = []
   for (let i = 0; i < CELL_COUNT; i++) cells.push(makeCell(i, rng, 'skeletalMuscle'))
   const agents: Agent[] = []
@@ -987,6 +998,7 @@ export function enterFelidGut(world: ParasiteWorld, cfg: ParasiteConfig): Parasi
   }
   return {
     ...world,
+    rng,
     compartment: 'felidGut',
     host: createHostState(cfg.immunosuppression),
     cells,
@@ -1006,7 +1018,7 @@ export function enterFelidGut(world: ParasiteWorld, cfg: ParasiteConfig): Parasi
  * start in soil.
  */
 export function seedEnvironment(world: ParasiteWorld, count = 24): ParasiteWorld {
-  const rng = world.rng
+  const rng = forkRng(world)
   const oocysts: Oocyst[] = []
   const n = Math.min(MAX_OOCYSTS, count)
   for (let i = 0; i < n; i++) {
@@ -1027,6 +1039,7 @@ export function seedEnvironment(world: ParasiteWorld, count = 24): ParasiteWorld
   }
   return {
     ...world,
+    rng,
     compartment: 'environment',
     oocysts,
     agents: [],
@@ -1069,7 +1082,7 @@ export function shedToEnvironment(world: ParasiteWorld, count = 24): ParasiteWor
 export function ingestOocysts(world: ParasiteWorld, cfg: ParasiteConfig): ParasiteWorld {
   const viable = world.oocysts.filter((o) => o.sporulated && o.viability > 0)
   const inoculum = Math.min(8, Math.max(1, viable.length * SPOROZOITES_PER_OOCYST))
-  const rng = world.rng
+  const rng = forkRng(world)
   const cells: HostCell[] = []
   for (let i = 0; i < CELL_COUNT; i++) {
     cells.push(makeCell(i, rng, pickNiche(nextFloat(rng), { [cfg.nicheFocus]: 0.45 })))
@@ -1081,6 +1094,7 @@ export function ingestOocysts(world: ParasiteWorld, cfg: ParasiteConfig): Parasi
   }
   return {
     ...world,
+    rng,
     compartment: 'intermediateTissue',
     host: createHostState(cfg.immunosuppression),
     cells,

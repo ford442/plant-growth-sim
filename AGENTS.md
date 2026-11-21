@@ -47,9 +47,10 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - `src/simulation/parasite/egress.ts` — FNT acidification → Ca²⁺ → TgPLP1 pores
 - `src/simulation/parasite/hostImmunity.ts` — IL-12/IFN-γ/IRG/NO/ROS fields, ROP effectors, tissue niches
 - `src/simulation/parasite/lifeCycleGraph.ts` — declarative stage transitions (research §12.1)
-- `src/simulation/parasite/world.ts` — the one pure `stepWorld()` over agents, cells, vacuoles, cysts and oocysts
+- `src/simulation/parasite/world.ts` — the one pure `stepWorld()` over agents, cells, vacuoles, cysts and oocysts (never mutates its input; draws from a `forkRng` copy of `world.rng`)
+- `src/simulation/parasite/fixedStep.ts` — `advanceFixed()`: spends real time × speed as identical fixed steps (`FIXED_STEP_SECONDS` = 1/60 of a 1× second, both gears; ≤ `MAX_STEPS_PER_FRAME`), so a run depends on seed + step count, never on frame rate
 - `src/simulation/parasite/objectives.ts` + `modifiers.ts` — objective registry, ΔBFD1/Δplp1/ΔMIC2/terminal-latency modifiers, comparative Sarcocystidae
-- `src/stores/parasiteStore.ts` — sibling of `simStore`; holds state, forwards the clock, evaluates the objective
+- `src/stores/parasiteStore.ts` — sibling of `simStore`; holds state and the fixed-step `accumulator`, forwards the clock through `advanceFixed`, evaluates the objective after every step
 - `src/components/ParasiteViewer.tsx` + `parasite/OrganelleView.tsx` + `ParasitePanels.tsx` — four view scales and the UI
 - Design lock: `docs/design/parasite-mode.md`
 
@@ -81,7 +82,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Soil mineral field (`SoilField.ts`, 3 soils) under the plant: rain reaches the plant only through it; minerals feed back via calcium nutrition and hardpans; geodes / rhizoliths form around roots
 - 6 species presets
 - Gem mode: 6 gemstones (quartz, amethyst, diamond, ruby, emerald, topaz), formation / crystal / lattice views, T–P–saturation–dopant controls; per-gem optics (pleochroism, fluorescence, heat glow, inclusions, etch frost) on both renderers, TSL gem material under `?renderer=webgpu`; habit eases smoothly between growth states
-- Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. 51 unit tests (`npm test`)
+- Parasite mode: *T. gondii* life-cycle sim-game — full lytic loop (invade → PV → endodyogeny → egress), BFD1 latency and reactivation, felid sexual cycle, environmental oocysts, 5 objectives, 4 challenge modifiers, 4 comparative species, 4 view scales. Pure-sim unit tests, purity + golden-run tests (seed 42) and a fixed-step clock (`npm test`)
 
 ## Next High-Value Tasks
 1. ~~Replace lineSegments with proper tube / instanced cylinder branches~~ (done: one instanced cylinder per L-system segment, `branchMatrix.ts`; next: taper along a branch / pipe-model thickening, TSL bark material)
@@ -117,6 +118,10 @@ npm test
 - Known issue (pre-existing): plant size is not normalised. `F → FF` doubles the stem each iteration (oak ≈ 28 units tall at iteration 5, bamboo ≈ 1000 at 7), the view only scales by `height / 1.8`, and the camera is fixed, so plants outgrow the frame after iteration ~3. Fit the camera or the display scale to the morph's bounds before changing leaf sizes to compensate
 - Leaves: one per closed shoot (`]`) plus the apex, so the morph lineage (`LSystemMorph.ts`) is unchanged; the blade is `leafGeometry.ts`, shared per shape + level of detail. Worst case is bamboo at iteration 7 (39 k leaves → 2-row blades, ~0.31 M triangles on top of the ~0.65 M of branches)
 - The parasite sim is pure and unit-tested — run `npm test` after touching `src/simulation/parasite/`
+- Parasite purity: `stepWorld` and the passage functions (`enterFelidGut`, `seedEnvironment`, `ingestOocysts`, `shedToEnvironment`) must return a new world and leave the input untouched — `nextFloat` advances an `Rng` **in place**, so always draw from `forkRng(world)` and return that fork as the new `rng`, never from `world.rng` directly. `purity.test.ts` deep-freezes the input to catch any in-place write
+- Parasite clock: the store never calls `stepWorld` with a frame `dt`; it feeds `advanceFixed`, which runs identical fixed steps. The speed slider changes how *many* steps run, not their size. Do not "simplify" this back to one step per frame — it makes a seed's run depend on the device (`docs/design/parasite-mode.md` §5.6)
+- Golden runs (`golden.test.ts`): seed 42 at fixed steps → pinned stage counts. A failure means the sim now *plays differently*, not necessarily that it is wrong: if the change is intended, re-record with `npx vitest run -u src/simulation/parasite/golden.test.ts` and say why in the commit. It catches ~15% retunes of the BFD switch but not tiny ones (the `bfdSwitch` unit tests cover its kinetics)
+- Every life-cycle transition's guard is tested clause by clause in `lifeCycleGuards.test.ts`, keyed by `TransitionId` — a new transition without a case there is a compile error
 - Parasite time is two gears (action seconds vs lesion hours); never collapse them into one clock without reading `docs/design/parasite-mode.md` §3
 - When adding a parasite stage, extend `LifeStage` + `STAGE_DEFS` and add its transitions to `LIFE_CYCLE`
 - When adding species, update `SpeciesId`, `SPECIES_LSYSTEMS`, `SPECIES_TISSUE` and `SPECIES_ROOTS` (typed on `SpeciesId`, so a missing entry is a compile error)

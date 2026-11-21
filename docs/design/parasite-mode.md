@@ -145,6 +145,26 @@ Recorded because they are not obvious from the research doc alone:
    lethal without 10,000 draw calls.
 5. **Oocysts weather whether or not they sporulate.** Otherwise a cohort that
    cannot mature (too hot, too dry, anoxic) would live forever.
+6. **The world advances in fixed steps, not frame deltas.** The store banks
+   real time × speed in an accumulator and `advanceFixed` spends it as
+   identical steps of 1/60 s of 1× play (0.015 lesion hours + ≈0.067 action
+   seconds — both gears move together, §3). The speed slider changes the number
+   of steps per frame, never their size, so a seed plays the same run at 60 Hz,
+   144 Hz or on a slow phone, and golden/replay tests are possible. The
+   original issue suggested 0.25 sim-hours; that is ≈0.28 s of play at 1×, and
+   because the views read `world` each frame without interpolation it would
+   move every parasite only ~3.6 times a second. A step costs ≈0.04 ms (p99
+   ≈0.2 ms with the scene full), so the finer step is free. A frame is capped
+   at 48 steps (the longest legal frame — 0.1 s at the 6× maximum — owes 36);
+   beyond that time is dropped, so a slow device plays in slow motion rather
+   than falling behind. The objective is judged after every step, so a win or
+   a loss lands on the same step whatever the frame rate.
+7. **`stepWorld` is pure, including the RNG.** `nextFloat` mutates its `Rng` in
+   place, and the step used to draw from `world.rng` directly — so it changed
+   the world it was given, and stepping the same world twice gave different
+   answers. It now draws from a fork and returns it as the new `rng`. The
+   sequence of draws in a linear run is unchanged, so seeded outcomes did not
+   move.
 
 ---
 
