@@ -4,6 +4,7 @@ import { useSimStore } from '../stores/simStore'
 import { useTimeStore } from '../stores/timeStore'
 import { useModeStore } from '../stores/modeStore'
 import { useParasiteStore } from '../stores/parasiteStore'
+import { useLyticStore } from '../stores/lyticStore'
 import { GEMSTONE_PRESETS } from '../simulation/GemstonePresets'
 import { specimenMetrics } from '../simulation/CrystalGrowth'
 import { ACTION_SECONDS_PER_SECOND, LESION_HOURS_PER_SECOND, REFERENCE_SPEED } from '../simulation/parasite/stages'
@@ -16,6 +17,10 @@ export function SimControls() {
   const resetCrystal = useSimStore((s) => s.resetCrystal)
   const resetParasite = useParasiteStore((s) => s.reset)
   const rerollParasite = useParasiteStore((s) => s.reroll)
+  // while the lytic sandbox is showing, Reset / Reseed act on it, not the world
+  const sandbox = useLyticStore((s) => s.active)
+  const replayLytic = useLyticStore((s) => s.replay)
+  const rerollLytic = useLyticStore((s) => s.reroll)
   const mode = useModeStore((s) => s.mode)
   const speed = useTimeStore((s) => s.speed)
   const setSpeed = useTimeStore((s) => s.setSpeed)
@@ -49,12 +54,12 @@ export function SimControls() {
         </button>
         <button
           className="btn"
-          onClick={mode === 'parasite' ? resetParasite : mode === 'gem' ? resetCrystal : reset}
+          onClick={mode === 'parasite' ? (sandbox ? replayLytic : resetParasite) : mode === 'gem' ? resetCrystal : reset}
         >
           ↺ Reset
         </button>
         {mode === 'parasite' && (
-          <button className="btn" onClick={rerollParasite} title="Restart with a different random seed">
+          <button className="btn" onClick={sandbox ? rerollLytic : rerollParasite} title="Restart with a different random seed">
             🎲 Reseed
           </button>
         )}
@@ -87,7 +92,7 @@ export function SimControls() {
       </div>
 
       {mode === 'parasite' ? (
-        <ParasiteStats />
+        sandbox ? <LyticStats /> : <ParasiteStats />
       ) : mode === 'gem' ? (
         <CrystalStats />
       ) : (
@@ -150,6 +155,32 @@ function CrystalStats() {
       <div className="stat">
         <span className="stat-label">Growth zones</span>
         <span className="stat-value">{crystal.zones.length}</span>
+      </div>
+    </div>
+  )
+}
+
+/** The lytic sandbox's two gears; it has no population to report. */
+function LyticStats() {
+  const speed = useTimeStore((s) => s.speed)
+  const lesionHours = useLyticStore((s) => Math.floor(s.lytic.lesionHours * 10) / 10)
+  const actionSeconds = useLyticStore((s) => Math.floor(s.lytic.actionSeconds))
+  const k = speed / REFERENCE_SPEED
+  return (
+    <div className="stats-grid">
+      <div className="stat">
+        <span className="stat-label">Lesion clock</span>
+        <span className="stat-value">{lesionHours.toFixed(1)} h</span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Action clock</span>
+        <span className="stat-value">{actionSeconds} s</span>
+      </div>
+      <div className="stat">
+        <span className="stat-label">Gearing</span>
+        <span className="stat-value">
+          {(LESION_HOURS_PER_SECOND * k).toFixed(1)} h/s · {(ACTION_SECONDS_PER_SECOND * k).toFixed(0)}× motion
+        </span>
       </div>
     </div>
   )

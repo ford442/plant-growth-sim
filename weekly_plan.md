@@ -110,6 +110,7 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 - [x] Glideosome helical inward-traction kinematics (not freeflight)  
 - [x] MJ sequence: MIC → orient → RON/AMA1 ring → PV, with AMA1 shedding as a real failure mode  
 - [x] Egress: FNT acidify → Ca²⁺ → TgPLP1 pores, plus the Δplp1 trapped path  
+- [x] Single-cell lytic sandbox ("Lytic cycle" view): one seeded loop glide → attach → invade → PV → endodyogeny → egress, with ΔPLP1 and RNG2-loss flags  
 
 #### C3 — Host field + immunity game — [#5](https://github.com/ford442/plant-growth-sim/issues/5) ✅
 - [x] ROS / IL-12 / IFN-γ / IRG / NO pressure fields  

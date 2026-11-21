@@ -25,8 +25,9 @@ import {
 } from '../simulation/parasite/world'
 import { crescentGeometry, hideInstance, orientInstance } from './parasite/bodyGeometry'
 import { OrganelleView } from './parasite/OrganelleView'
+import { CellSandboxView } from './parasite/CellSandboxView'
 
-export type ParasiteViewScale = 'environment' | 'tissue' | 'cell' | 'organelle'
+export type ParasiteViewScale = 'environment' | 'tissue' | 'cell' | 'organelle' | 'sandbox'
 
 /** World units per micrometre, per view. */
 const UNIT: Record<ParasiteViewScale, number> = {
@@ -34,6 +35,7 @@ const UNIT: Record<ParasiteViewScale, number> = {
   tissue: 0.105,
   cell: 0.17,
   organelle: 1,
+  sandbox: 0.12,
 }
 
 export const PARASITE_VIEW_TARGET: Record<ParasiteViewScale, [number, number, number]> = {
@@ -41,6 +43,7 @@ export const PARASITE_VIEW_TARGET: Record<ParasiteViewScale, [number, number, nu
   tissue: [0, 0, 0],
   cell: [0, 0, 0],
   organelle: [0, 0, 0],
+  sandbox: [0, 0, 0],
 }
 
 /**
@@ -53,6 +56,7 @@ const VIEW_DISTANCE: Record<ParasiteViewScale, number> = {
   tissue: 15.5,
   cell: 9,
   organelle: 9.5,
+  sandbox: 10.5,
 }
 
 /**
@@ -65,6 +69,8 @@ const VIEW_DIRECTION: Record<ParasiteViewScale, [number, number, number]> = {
   tissue: [0.15, 0.4, 1],
   cell: [0.15, 0.4, 1],
   organelle: [1, 0.3, 0.42],
+  // looking down onto the dish, so the glide trail and the host dome both read
+  sandbox: [0.2, 0.85, 0.75],
 }
 
 /**
@@ -691,6 +697,12 @@ export function ParasiteViewer({ scale }: { scale: ParasiteViewScale }) {
       {scale === 'tissue' && inHost && <TissueScene />}
       {scale === 'cell' && inHost && <CellScene />}
       {scale === 'environment' && <EnvironmentScene />}
+      {/* the lytic sandbox is its own experiment: it does not need a host in the world */}
+      {scale === 'sandbox' && (
+        <group scale={UNIT.sandbox}>
+          <CellSandboxView />
+        </group>
+      )}
       {scale === 'organelle' && (
         <group scale={UNIT.organelle}>
           <OrganelleView />

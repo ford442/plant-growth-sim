@@ -71,6 +71,31 @@ export function advanceFixed(
   speed: number,
   stopAfter?: (world: ParasiteWorld) => boolean,
 ): FixedStepResult {
+  const r = advanceSteps(world, (w) => stepWorld(w, cfg, FIXED_STEP_CLOCKS), accumulator, dtSeconds, speed, stopAfter)
+  return { world: r.state, accumulator: r.accumulator, steps: r.steps, dropped: r.dropped }
+}
+
+export interface StepsResult<T> {
+  state: T
+  accumulator: number
+  steps: number
+  dropped: number
+}
+
+/**
+ * The fixed-step budget for any pure, step-at-a-time sim on the parasite clock
+ * (the world, the lytic sandbox): same step size, same per-frame cap, same
+ * remainder handling. `step` must be pure and always advance by
+ * {@link FIXED_STEP_CLOCKS}.
+ */
+export function advanceSteps<T>(
+  state: T,
+  step: (state: T) => T,
+  accumulator: number,
+  dtSeconds: number,
+  speed: number,
+  stopAfter?: (state: T) => boolean,
+): StepsResult<T> {
   const dt = finiteOrZero(dtSeconds)
   const k = finiteOrZero(speed) / REFERENCE_SPEED
   const owed = accumulator + (dt * k) / FIXED_STEP_SECONDS
@@ -83,12 +108,12 @@ export function advanceFixed(
     whole = MAX_STEPS_PER_FRAME
   }
 
-  let w = world
+  let s = state
   let steps = 0
   while (steps < whole) {
-    w = stepWorld(w, cfg, FIXED_STEP_CLOCKS)
+    s = step(s)
     steps++
-    if (stopAfter?.(w)) break
+    if (stopAfter?.(s)) break
   }
-  return { world: w, accumulator: remainder, steps, dropped }
+  return { state: s, accumulator: remainder, steps, dropped }
 }
