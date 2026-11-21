@@ -21,11 +21,10 @@ import {
 } from './LSystemMorph'
 
 /**
- * The shipped presets only use `+`/`-` (yaw). The turtle starts pointing straight up,
- * where yaw has no sideways effect, so every preset currently grows as a vertical
- * line. The morph must not depend on that, so the same suite also runs on rule sets
- * that tilt with `&`/`^` (pitch) and fan out with `+`/`-` — real 3D branching, side
- * branches, nested brackets and an `F → F[…]F` rule with no buds.
+ * The shipped presets only use `+`/`-` (yaw) and get their 3D spread from the turtle's
+ * branch roll. The morph must not depend on that, so the same suite also runs on rule
+ * sets that tilt with `&`/`^` (pitch) and fan out with `+`/`-` — side branches, nested
+ * brackets and an `F → F[…]F` rule with no buds.
  */
 const BRANCHING: Record<string, LSystemDef> = {
   'tilted sunflower': {

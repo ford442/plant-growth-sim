@@ -9,7 +9,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
  *
  * v0 limitations: static snapshot (no animation tracks; wind sway is baked in
  * at its current pose), branches and leaves use EXT_mesh_gpu_instancing (one
- * cylinder / plane instance per segment / leaf), and materials are plain PBR
+ * cylinder / leaf-blade instance per segment / leaf), and materials are plain PBR
  * colours (no textures).
  */
 let root: THREE.Object3D | null = null

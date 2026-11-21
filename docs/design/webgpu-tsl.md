@@ -61,7 +61,9 @@ storage buffers would not).
 ## 4. The prototype: TSL leaf material
 
 `MeshSSSNodeMaterial` (a physical node material with a thickness / back-scatter
-term), double-sided, on the existing instanced plane. Geometry is unchanged.
+term), double-sided, on the shared instanced leaf blade (`leafGeometry.ts`: a UV-mapped strip
+with u across the blade, midrib at 0.5, v base → tip — the material draws its veins and
+flutter from those UVs, so any blade mesh must keep that layout).
 
 | Effect | Mechanism |
 | --- | --- |
