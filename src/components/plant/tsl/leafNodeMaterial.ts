@@ -19,8 +19,8 @@
  *  - flutter       wind moves the free tip of each leaf, out of phase per leaf
  *
  * The four inputs are uniforms driven by `leafAppearance()`; changing them
- * never recompiles the pipeline. Shape stays the instanced plane — this
- * material only changes shading and a vertex offset.
+ * never recompiles the pipeline. Shape comes from the shared blade mesh
+ * (`leafGeometry.ts`) — this material only changes shading and a vertex offset.
  */
 import { Color, DoubleSide } from 'three'
 import { MeshSSSNodeMaterial } from 'three/webgpu'
@@ -67,7 +67,7 @@ export function createLeafNodeMaterial(initialBaseColor = '#3d8b3d'): LeafNodeMa
   const uFlutter = uniform(0)
 
   // --- albedo ---------------------------------------------------------------
-  // Midrib plus lateral veins slanting towards the tip, from the plane's UVs.
+  // Midrib plus lateral veins slanting towards the tip, from the blade's UVs (u across, midrib at 0.5; v base → tip).
   const veins = Fn(() => {
     const { x: u, y: v } = uv()
     const fromMid = abs(u.sub(0.5))

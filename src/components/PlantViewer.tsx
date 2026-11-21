@@ -62,7 +62,8 @@ function Leaves({ plant, color, nodeMaterial }: LeavesProps) {
       frustumCulled={false}
     >
       <primitive object={plant.leafMatrices} attach="instanceMatrix" />
-      <planeGeometry args={[1, 1.4]} />
+      {/* shared between plants, so a primitive: R3F must not dispose it on unmount */}
+      <primitive object={plant.leafGeometry} attach="geometry" />
       {nodeMaterial ? (
         // owned (and disposed) by useLeafNodeMaterial, which outlives this re-keyed mesh
         <primitive object={nodeMaterial} attach="material" />

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { SPECIES_LSYSTEMS } from '../../simulation/LSystem'
+import { SPECIES_LSYSTEMS, leafSpec, type LeafSpec } from '../../simulation/LSystem'
 import {
   LEAF_STRIDE,
   MAX_ITERATIONS,
@@ -11,6 +11,7 @@ import {
   type MorphBuilder,
 } from '../../simulation/LSystemMorph'
 import { branchDetail, writeBranchMatrices, type BranchDetail } from './branchMatrix'
+import { createLeafGeometry, leafRows } from './leafGeometry'
 import { writeLeafMatrices } from './leafMatrix'
 
 /** Re-posing is skipped when the factor moved less than this (stalled growth costs nothing). */
@@ -19,7 +20,8 @@ const T_EPSILON = 1e-4
 /**
  * The drawable form of one L-system morph: branch and leaf instance-matrix
  * buffers whose contents are re-posed in place for any t. A branch is one
- * instance of a shared cylinder (`branchGeometry`), a leaf one of a plane.
+ * instance of a shared cylinder (`branchGeometry`), a leaf one of the species'
+ * shared blade (`leafGeometry`).
  *
  * It is shared by every plant on screen at the same stage (the macro view
  * draws three of the same species), so a frame costs one re-pose rather than
@@ -36,6 +38,8 @@ export class MorphedPlant {
   /** The unit cylinder every branch instances; shared between plants, so not owned (never disposed) here. */
   readonly branchGeometry: THREE.BufferGeometry
   readonly branchMatrices: THREE.InstancedBufferAttribute
+  /** The species' blade, simplified for the number of leaves; shared between plants, so not owned (never disposed) here. */
+  readonly leafGeometry: THREE.BufferGeometry
   readonly leafMatrices: THREE.InstancedBufferAttribute
 
   private readonly morph: LSystemMorph
@@ -44,7 +48,7 @@ export class MorphedPlant {
   private readonly leafPose: Float32Array
   private lastT = NaN
 
-  constructor(key: string, morph: LSystemMorph) {
+  constructor(key: string, morph: LSystemMorph, leaf: LeafSpec) {
     this.key = key
     this.morph = morph
     this.stage = morph.iterations
@@ -57,6 +61,7 @@ export class MorphedPlant {
     this.segmentPose = new Float32Array(morph.segmentsTo.length)
     this.thicknessPose = new Float32Array(morph.segmentCount)
 
+    this.leafGeometry = getLeafGeometry(leaf, leafRows(morph.leafCount))
     this.leafMatrices = new THREE.InstancedBufferAttribute(new Float32Array(morph.leafCount * 16), 16)
     this.leafMatrices.setUsage(THREE.DynamicDrawUsage)
     this.leafPose = new Float32Array(morph.leafCount * LEAF_STRIDE)
@@ -115,6 +120,21 @@ function getBranchGeometry({ radialSegments, capped }: BranchDetail): THREE.Buff
   return g
 }
 
+// --- shared leaf blades -------------------------------------------------------
+
+const blades = new Map<string, THREE.BufferGeometry>()
+
+/** One blade per shape and level of detail, shared by every plant, so it lives for the page. */
+function getLeafGeometry(leaf: LeafSpec, rows: number): THREE.BufferGeometry {
+  const key = `${leaf.shape}:${leaf.aspect}:${leaf.fold}:${leaf.curl}:${rows}`
+  let g = blades.get(key)
+  if (!g) {
+    g = createLeafGeometry(leaf, rows)
+    blades.set(key, g)
+  }
+  return g
+}
+
 // --- shared cache -----------------------------------------------------------
 
 /** Current morph plus the one(s) just left behind; older ones are disposed. */
@@ -138,12 +158,13 @@ export function getMorphedPlant(species: string, stage: number): MorphedPlant {
     return hit
   }
 
+  const def = SPECIES_LSYSTEMS[species] ?? SPECIES_LSYSTEMS.sunflower
   let builder = builders.get(species)
   if (!builder) {
-    builder = createMorphBuilder(SPECIES_LSYSTEMS[species] ?? SPECIES_LSYSTEMS.sunflower)
+    builder = createMorphBuilder(def)
     builders.set(species, builder)
   }
-  const plant = new MorphedPlant(key, builder.morph(n))
+  const plant = new MorphedPlant(key, builder.morph(n), leafSpec(def))
   plants.set(key, plant)
 
   while (plants.size > MAX_CACHED) {
