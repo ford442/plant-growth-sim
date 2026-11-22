@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { activateAbility, type AbilityId } from '../simulation/parasite/abilities'
 import { advanceFixed } from '../simulation/parasite/fixedStep'
 import type { EffectorFlags, NicheId, StressLevers } from '../simulation/parasite/hostImmunity'
 import {
@@ -14,6 +15,7 @@ import {
   type ObjectiveId,
   type ObjectiveProgress,
 } from '../simulation/parasite/objectives'
+import type { GameTuning } from '../simulation/parasite/tuning'
 import {
   availablePassage,
   createWorld,
@@ -63,6 +65,14 @@ export interface ParasiteState {
   setSpecies: (species: ParasiteSpeciesId) => void
   setObjective: (objective: ObjectiveId) => void
   setForceEgress: (on: boolean) => void
+  /** Retune the win/lose thresholds (the Leva debug panel). */
+  setTuning: (partial: Partial<GameTuning>) => void
+  /**
+   * Fire a secreted effector. A no-op when it is knocked out, locked, already
+   * running or still recharging — `activateAbility` returns the same state, and
+   * the store leaves the world untouched so nothing re-renders.
+   */
+  fireAbility: (id: AbilityId) => void
   /** Take the transmission route the current state offers, if any. */
   passage: () => void
 }
@@ -173,6 +183,23 @@ export const useParasiteStore = create<ParasiteState>((set, get) => ({
   },
 
   setForceEgress: (forceEgress) => set((s) => ({ config: { ...s.config, forceEgress } })),
+
+  setTuning: (partial) =>
+    set((s) => {
+      const config = { ...s.config, tuning: { ...s.config.tuning, ...partial } }
+      // the thresholds decide the run, so a retune is judged immediately — and
+      // if it decides it, the clock stops on the result, exactly as `tick` does
+      const progress = evaluateObjective(s.objective, s.world, config)
+      if (progress.status !== 'active') useTimeStore.getState().pause()
+      return { config, progress }
+    }),
+
+  fireAbility: (id) => {
+    const { world, config } = get()
+    const abilities = activateAbility(world.abilities, id, config.effectors, world.tally.conversions)
+    if (abilities === world.abilities) return
+    set({ world: { ...world, abilities } })
+  },
 
   passage: () => {
     const { world, config, objective } = get()

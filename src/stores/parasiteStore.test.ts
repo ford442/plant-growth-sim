@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useParasiteStore } from './parasiteStore'
 import { useTimeStore } from './timeStore'
 import { FIXED_STEP_CLOCKS, FIXED_STEP_SECONDS } from '../simulation/parasite/fixedStep'
+import { ABILITY_DEFS } from '../simulation/parasite/abilities'
+import { DEFAULT_TUNING } from '../simulation/parasite/tuning'
 import { REFERENCE_SPEED } from '../simulation/parasite/stages'
 
 const par = () => useParasiteStore.getState()
@@ -19,6 +21,12 @@ function feed(total: number, dt: number) {
 beforeEach(() => {
   useTimeStore.getState().play()
   useTimeStore.getState().setSpeed(REFERENCE_SPEED) // 1×
+  // the genotype and the thresholds survive a reset, so put them back by hand:
+  // otherwise one test's knockout or retune leaks into the next
+  par().setEffector('rop16', true)
+  par().setEffector('rop18rop5', true)
+  par().setEffector('tgist', true)
+  par().setTuning({ ...DEFAULT_TUNING })
   par().setObjective('latentPassage') // also gives a fresh run from the seed
   par().reset()
 })
@@ -99,5 +107,57 @@ describe('parasite store: fixed-step clock', () => {
     const frozen = par().world
     par().tick(1)
     expect(par().world).toBe(frozen)
+  })
+})
+
+describe('parasite store: abilities and tuning', () => {
+  it('fires an ability, and runs it down on the shared clock', () => {
+    const before = par().world
+    par().fireAbility('rop16')
+    expect(par().world).not.toBe(before) // a real activation
+    expect(par().world.abilities.rop16.activeHours).toBe(ABILITY_DEFS.rop16.durationHours)
+    expect(par().world.abilities.rop16.uses).toBe(1)
+
+    // the ability clock is the lesion clock, so it is spent by ticking
+    feed(2, 1 / 60)
+    const spent = ABILITY_DEFS.rop16.durationHours - par().world.abilities.rop16.activeHours
+    expect(spent).toBeCloseTo(par().world.lesionHours, 6)
+  })
+
+  it('ignores a second press while the effector is still secreting', () => {
+    par().fireAbility('rop18rop5')
+    const firing = par().world
+    par().fireAbility('rop18rop5')
+    expect(par().world).toBe(firing) // identical state: nothing re-renders
+    expect(par().world.abilities.rop18rop5.uses).toBe(1)
+  })
+
+  it('ignores a press on a locked or knocked-out effector', () => {
+    // TgIST is locked until the run's first BFD1 conversion
+    const start = par().world
+    expect(start.tally.conversions).toBe(0)
+    par().fireAbility('tgist')
+    expect(par().world).toBe(start)
+
+    par().setEffector('rop16', false) // knockout
+    par().fireAbility('rop16')
+    expect(par().world.abilities.rop16.uses).toBe(0)
+  })
+
+  it('starts a fresh run with every ability idle', () => {
+    par().fireAbility('rop16')
+    feed(0.5, 1 / 60)
+    expect(par().world.abilities.rop16.uses).toBe(1)
+    par().reset()
+    expect(par().world.abilities.rop16).toEqual({ activeHours: 0, cooldownHours: 0, uses: 0 })
+  })
+
+  it('re-judges the objective the moment a threshold is retuned', () => {
+    feed(1, 1 / 60) // a little under an hour of lesion time
+    expect(par().progress.status).toBe('active')
+    // a window that has already closed, with no cysts banked: an instant loss
+    par().setTuning({ holdDays: 0.01 })
+    expect(par().progress.status).toBe('lost')
+    expect(par().progress.reason).toMatch(/window/i)
   })
 })

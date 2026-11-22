@@ -11,8 +11,16 @@
 
 import { clamp01 } from './math'
 import type { Modifiers } from './modifiers'
+import type { NicheId } from './hostImmunity'
 import type { Compartment } from './stages'
-import { MATURE_CYST_BRADYZOITES, type ParasiteConfig, type ParasiteWorld } from './world'
+import { DEFAULT_TUNING, type GameTuning } from './tuning'
+import {
+  MATURE_CYST_BRADYZOITES,
+  parasiteExtinct,
+  type Cyst,
+  type ParasiteConfig,
+  type ParasiteWorld,
+} from './world'
 
 export type ObjectiveId =
   | 'latentPassage'
@@ -50,8 +58,45 @@ export interface ObjectiveDef {
   evaluate: (world: ParasiteWorld, cfg: ParasiteConfig) => ObjectiveProgress
 }
 
-/** Mature cysts needed for the primary objective. */
-export const LATENT_TARGET = 8
+/**
+ * Niches that count as the transmission reservoir — CNS and muscle, the tissues
+ * that actually carry a chronic infection to the next host (research §2.2).
+ *
+ * The retina is a documented cyst site and an immune-privileged one, so it is
+ * an easy place to hide; it is deliberately *not* a reservoir, because a few
+ * cysts in a few square millimetres of retina is not what a predator eats. The
+ * objective panel reports retinal cysts separately so the exclusion is visible
+ * rather than mysterious.
+ */
+export const RESERVOIR_NICHES: NicheId[] = [
+  'cnsCortex',
+  'cnsAmygdala',
+  'skeletalMuscle',
+  'cardiacMuscle',
+]
+
+const isReservoir = (n: NicheId) => RESERVOIR_NICHES.includes(n)
+
+/** Does this cyst count toward the primary objective? */
+export const isReservoirCyst = (c: Cyst, tuning: GameTuning): boolean =>
+  c.intact && isReservoir(c.niche) && c.diameter >= tuning.matureDiameterUm
+
+/**
+ * Cysts that count: intact, in CNS or muscle, and grown past the tuning's
+ * diameter. This is a different (stricter) notion from `tally.matureCysts`,
+ * which is the research figure of ≥256 bradyzoites (≈39 µm) and is what the
+ * reference panel reports. The objective wants well-grown cysts in the
+ * reservoir, so it measures them in micrometres, as the issue specifies.
+ */
+export const reservoirCysts = (world: ParasiteWorld, tuning: GameTuning): number =>
+  world.cysts.reduce((n, c) => n + (isReservoirCyst(c, tuning) ? 1 : 0), 0)
+
+/**
+ * Reservoir cysts needed for the primary objective. The live value is
+ * `cfg.tuning.latentTarget` — this is its default, kept as a named export for
+ * the design doc, the tests and the panels' static copy.
+ */
+export const LATENT_TARGET = DEFAULT_TUNING.latentTarget
 /** Amygdala cysts needed for the tropism objective. */
 export const AMYGDALA_TARGET = 5
 /**
@@ -63,7 +108,7 @@ export const WINTER_TARGET_DAYS = 365
 /** Lytic cycles that count as "the host never got on top of it". */
 export const RUNAWAY_TARGET = 30
 /** Host health below which the primary objective is considered failed. */
-export const HOST_FLOOR = 0.2
+export const HOST_FLOOR = DEFAULT_TUNING.hostFloor
 
 const pct = (x: number) => `${Math.round(clamp01(x) * 100)}%`
 
@@ -72,26 +117,70 @@ export const OBJECTIVES: Record<ObjectiveId, ObjectiveDef> = {
     id: 'latentPassage',
     name: 'Quiet tenant',
     brief: 'Establish lasting latency without killing the host that carries you.',
-    how: `Invade, replicate, then push stress (alkaline pH, NO) high enough to open BFD1 translation. Bank ${LATENT_TARGET} mature cysts while the host stays above ${Math.round(HOST_FLOOR * 100)}% health.`,
+    how:
+      `Invade, replicate, then push stress (alkaline pH, NO) high enough to open BFD1 translation. ` +
+      `Hold ${DEFAULT_TUNING.latentTarget} cysts of ${DEFAULT_TUNING.matureDiameterUm} µm or more in CNS and muscle ` +
+      `at day ${DEFAULT_TUNING.holdDays}, with the host still above ${Math.round(DEFAULT_TUNING.hostFloor * 100)}% health.`,
     startCompartment: 'intermediateTissue',
-    evaluate: (world) => {
-      const mature = world.tally.matureCysts
-      const progress = clamp01(mature / LATENT_TARGET)
+    evaluate: (world, cfg) => {
+      const tuning = cfg.tuning ?? DEFAULT_TUNING
+      const banked = reservoirCysts(world, tuning)
+      const day = world.lesionHours / 24
+      const retinal = world.cysts.reduce(
+        (n, c) => n + (c.intact && c.niche === 'retina' && c.diameter >= tuning.matureDiameterUm ? 1 : 0),
+        0,
+      )
+
+      // Both halves have to reach 1 to win, so the bar is an honest half each:
+      // cysts banked, and time survived with them.
+      const cystPart = clamp01(banked / Math.max(1, tuning.latentTarget))
+      const timePart = clamp01(day / Math.max(1, tuning.holdDays))
+      const progress = clamp01(cystPart * 0.5 + timePart * 0.5)
+      // floored, never rounded: "day 30 / 30" must not appear while the window
+      // is still open
+      const metric = `${banked} / ${tuning.latentTarget} reservoir cysts · day ${Math.floor(day)} / ${tuning.holdDays}`
       const detail = [
-        `Host health ${pct(world.host.health)}`,
-        `${world.tally.cysts} cyst${world.tally.cysts === 1 ? '' : 's'}, ${world.tally.bradyzoitesInCysts} bradyzoites`,
-        `${world.tally.cellsLysed} host cells lysed`,
+        `Host health ${pct(world.host.health)} (floor ${pct(tuning.hostFloor)})`,
+        `${world.tally.cysts} cyst${world.tally.cysts === 1 ? '' : 's'} total, ${world.tally.bradyzoitesInCysts} bradyzoites`,
+        retinal > 0
+          ? `${retinal} retinal cyst${retinal === 1 ? '' : 's'} — privileged, but not a reservoir`
+          : `${world.tally.cellsLysed} host cells lysed`,
       ]
+      const result = (status: ObjectiveStatus, reason: string, p = progress): ObjectiveProgress => ({
+        status,
+        progress: status === 'won' ? 1 : p,
+        metric,
+        detail,
+        reason,
+      })
+
+      // --- loss: the host died, or is dying ---------------------------------
       if (world.host.health <= 0) {
-        return { status: 'lost', progress, metric: `${mature} / ${LATENT_TARGET} mature cysts`, detail, reason: 'The host died. A dead host transmits nothing.' }
+        return result('lost', 'The host died. A dead host transmits nothing.')
       }
-      if (mature >= LATENT_TARGET && world.host.health > HOST_FLOOR) {
-        return { status: 'won', progress: 1, metric: `${mature} / ${LATENT_TARGET} mature cysts`, detail, reason: 'Latency established. The host will carry these cysts for life.' }
+      if (world.host.health <= tuning.hostFloor) {
+        return result('lost', 'Host health collapsed below the floor — acute disease, not latency.')
       }
-      if (world.host.health <= HOST_FLOOR) {
-        return { status: 'lost', progress, metric: `${mature} / ${LATENT_TARGET} mature cysts`, detail, reason: 'Host health collapsed below the floor — acute disease, not latency.' }
+
+      // --- loss: cleared ----------------------------------------------------
+      // Too passive is a real failure mode, not a stall: with no parasite and
+      // no cyst anywhere there is nothing left to grow, however long the clock
+      // runs.
+      if (parasiteExtinct(world)) {
+        return result('lost', 'The host cleared the infection, and no cyst was banked before it did.')
       }
-      return { status: 'active', progress, metric: `${mature} / ${LATENT_TARGET} mature cysts`, detail }
+
+      // --- the deadline -----------------------------------------------------
+      if (day >= tuning.holdDays) {
+        return banked >= tuning.latentTarget
+          ? result('won', 'Latency established. The host will carry these cysts for life.')
+          : result(
+              'lost',
+              `Day ${tuning.holdDays} with ${banked} of ${tuning.latentTarget} reservoir cysts — the window for a chronic infection closed.`,
+            )
+      }
+
+      return { status: 'active', progress, metric, detail }
     },
   },
 

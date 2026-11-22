@@ -110,7 +110,15 @@ export interface ImmuneFields {
 
 export const QUIESCENT_FIELDS: ImmuneFields = { il12: 0.04, ifnGamma: 0.03, irg: 0.02, no: 0.02, ros: 0.05 }
 
-/** Secreted effectors the player can switch on (research §7). */
+/**
+ * Secreted effectors (research §7).
+ *
+ * A flag here means "this effector is acting on the host right now". The player
+ * does not set it directly: `simulation/parasite/abilities.ts` folds the
+ * strain's *carried* genes together with which abilities are currently
+ * secreting, and `stepWorld` passes that product in. Turning a carried gene off
+ * in the sidebar is a knockout; an ability on cooldown is simply silent.
+ */
 export interface EffectorFlags {
   /** ROP16: STAT3/6 phosphorylation → M2 macrophages, ↓IL-12, ↓NO, ↓ROS. */
   rop16: boolean
@@ -120,7 +128,12 @@ export interface EffectorFlags {
   tgist: boolean
 }
 
-export const DEFAULT_EFFECTORS: EffectorFlags = { rop16: true, rop18rop5: true, tgist: false }
+/**
+ * Wild-type genotype: the strain carries all three effector loci. Whether any
+ * of them is *acting* at a given moment is an ability question, not this one —
+ * see `abilities.ts`.
+ */
+export const DEFAULT_EFFECTORS: EffectorFlags = { rop16: true, rop18rop5: true, tgist: true }
 
 export interface HostState {
   /** 1 = well, 0 = dead. Lose condition for most objectives. */

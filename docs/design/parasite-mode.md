@@ -103,8 +103,27 @@ sim days so the two are never confused. Ideal cool, moist soil then gives
 
 **"Quiet tenant" — establish lasting latency without killing the host.**
 
-Reach **8 mature tissue cysts** (≥256 bradyzoites each) while host health stays
-above 20%. This was the C0 recommendation and it survives contact with the
+Hold **8 reservoir cysts at day 30**, with host health above 20%. A *reservoir
+cyst* is intact, **≥50 µm** across (about 460 bradyzoites through
+`cystDiameter`) and in **CNS or muscle** — the tissues that actually carry a
+chronic infection to the next host. Retinal cysts are counted and reported
+separately: the retina is an easy place to hide, but a few cysts in a few
+square millimetres of it is not what a predator eats.
+
+Three ways the run ends (`objectives.ts`, thresholds in `tuning.ts`):
+
+| Ending | Condition | What the player did wrong |
+|---|---|---|
+| **Win** | day 30, ≥8 reservoir cysts, health > 20% | — |
+| **Lose — too lytic** | health ≤ 20% at any point | let tachyzoites replicate unchecked |
+| **Lose — cleared** | no parasite, no cyst anywhere | never protected a vacuole; the host won the acute phase |
+| **Lose — window closed** | day 30, under target | encysted too early (too few parasites) or too late (vacuoles already stripped) |
+
+The window matters: reaching 8 cysts on day 12 is *not* a win, because cysts
+can still be stripped or reactivated before day 30. The player has to reach the
+target and then keep it.
+
+This was the C0 recommendation and it survives contact with the
 implementation, because it is the objective that forces the player to engage
 with the actual trade-off the parasite faces:
 
@@ -118,10 +137,61 @@ Push stress too early and there are too few parasites to encyst; too late and
 the host is dead. That is the real biology of chronic infection, and it is a
 legible game decision.
 
+The scripted runs in `golden.test.ts` pin all four endings from seed 42, and
+they are the acceptance evidence that the objective is winnable *and* losable
+both ways:
+
+| Script | Ending |
+|---|---|
+| effectors fired on cooldown, stress pushed at 48 h | **won**, 9 reservoir cysts, host at 100% |
+| effectors fired, stress never pushed | **lost** day 26.3, host floor, 78 cells lysed |
+| nothing fired, no stress | **lost** day 30 with 5 cysts — cleared in the acute phase |
+| effectors fired, stress pushed at 120 h | **lost** day 30 with 5 cysts — too late |
+
 The other four shipped objectives are: **Amygdala garden** (niche tropism),
 **Close the loop** (full heteroxenous cycle through a felid), **Oocyst winter**
 (environmental endurance) and **ΔBFD1 — runaway** (the knockout phenotype as a
 hard mode).
+
+---
+
+## 4a. Abilities: the effector economy
+
+The three ROP/GRA effectors (research §7) are the player's only verbs. Their
+*mechanisms* are modelled in `hostImmunity.ts`; what is game-only is the
+economy, and `abilities.ts` says so in as many words:
+
+| Ability | Acts for | Recharges | Role |
+|---|---|---|---|
+| **ROP16** | 20 h | 34 h | strategic: M2 skew, ↓IL-12 / NO / ROS, buys quiet time to build load |
+| **ROP18 + ROP5** | 12 h | 20 h | tactical: shields existing vacuoles from IRG, fired into a peak |
+| **TgIST** | 24 h | 80 h | the blunt one: throttles IFN-γ at source; unlocked by the run's first conversion |
+
+Two switches, kept apart on purpose:
+
+- **Carried** (`EffectorFlags` in the config, the sidebar tick boxes) — does
+  this strain have the gene at all? Unticking one is a knockout for the run.
+- **Active** (`AbilityStates` on the world, the HUD buttons) — is it being
+  secreted *right now*?
+
+`activeEffectors()` is the product of the two, and that product — never the
+carried flags alone — is what `stepWorld` hands the host model. So a wild-type
+strain with nothing fired is, as far as the host can tell, a triple knockout.
+That is the whole mechanic: the player's advantage is *intermittent*, and the
+immune ramp is not.
+
+Durations are on the lesion clock and are marked `// TUNING`. A real tachyzoite
+injects its rhoptry bulb at every invasion and secretes GRAs continuously;
+there is no published cooldown. They are chosen against the clocks they compete
+with — the adaptive arm needs ~24 h to start and ~72 h to saturate, M2
+polarisation itself eases over ~10 h, and the objective window is 30 days — so
+an ability has to matter over hours and recharge several times inside one
+immune ramp.
+
+The win/lose thresholds live in `tuning.ts` on `ParasiteConfig`, so the
+objective table stays data-driven and `?debug=1` opens a Leva panel that
+retunes a live run (the panel is lazy-loaded; `leva` never enters the default
+bundle).
 
 ---
 
@@ -159,7 +229,11 @@ Recorded because they are not obvious from the research doc alone:
    beyond that time is dropped, so a slow device plays in slow motion rather
    than falling behind. The objective is judged after every step, so a win or
    a loss lands on the same step whatever the frame rate.
-7. **`stepWorld` is pure, including the RNG.** `nextFloat` mutates its `Rng` in
+7. **The overflow pool is drawn from in whole parasites.** Immunity eats a
+   *fraction* of the aggregate per step, so the refill loop's `overflow > 0`
+   handed a scene slot to 0.3 of a parasite and left the pool negative. It is
+   `>= 1` now, and `parasiteExtinct` reads a pool under 1 as empty.
+8. **`stepWorld` is pure, including the RNG.** `nextFloat` mutates its `Rng` in
    place, and the step used to draw from `world.rng` directly — so it changed
    the world it was given, and stepping the same world twice gave different
    answers. It now draws from a fork and returns it as the new `rng`. The
