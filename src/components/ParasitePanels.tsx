@@ -26,6 +26,7 @@ import {
 } from '../simulation/parasite/objectives'
 import { COMPARTMENT_LABEL, STAGE_DEFS } from '../simulation/parasite/stages'
 import { availablePassage, MATURE_CYST_BRADYZOITES } from '../simulation/parasite/world'
+import { useSliceViewStore } from '../stores/sliceViewStore'
 import type { ParasiteViewScale } from './ParasiteViewer'
 
 const pct = (x: number) => `${Math.round(x * 100)}%`
@@ -399,7 +400,7 @@ export function ParasiteInfoPanel({ scale }: { scale: ParasiteViewScale }) {
         </>
       )}
 
-      {scale === 'tissue' && (
+      {(scale === 'tissue' || scale === 'slice') && (
         <>
           <div className="status-label">Cysts by niche</div>
           <div className="habit-list">
@@ -516,6 +517,9 @@ export function ParasiteViewportHint({ scale }: { scale: ParasiteViewScale }) {
   const oocysts = useParasiteStore((s) => s.world.oocysts.length)
   const infected = useParasiteStore((s) => s.world.cells.filter((c) => c.pv).length)
   const free = useParasiteStore((s) => s.world.agents.length)
+  const cysts = useParasiteStore((s) => s.world.tally.cysts)
+  // a stress-test garden is drawn without any cysts in the sim
+  const stress = useSliceViewStore((s) => s.stress)
 
   let hint: string | null = null
   if (scale === 'environment' && oocysts === 0) {
@@ -523,8 +527,11 @@ export function ParasiteViewportHint({ scale }: { scale: ParasiteViewScale }) {
       compartment === 'environment'
         ? 'Every oocyst in this cohort has weathered away.'
         : 'No oocysts in the soil yet. They appear here once a felid completes the sexual cycle and sheds.'
-  } else if ((scale === 'tissue' || scale === 'cell') && compartment === 'environment') {
+  } else if ((scale === 'tissue' || scale === 'slice' || scale === 'cell') && compartment === 'environment') {
     hint = 'This is the environmental phase — there is no host. Infect a new one from the objective panel.'
+  } else if (scale === 'slice' && cysts === 0 && stress === 0) {
+    hint =
+      'No tissue cysts yet. Stress a vacuole — alkaline shift, nutrient deprivation or heat shock — and it converts and walls itself off; the cyst appears here and grows.'
   } else if (scale === 'cell' && infected === 0) {
     hint =
       free > 0
