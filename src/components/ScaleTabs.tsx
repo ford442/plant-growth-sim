@@ -24,6 +24,7 @@ export const GEM_TABS: TabDef<GemViewScale>[] = [
 export const PARASITE_TABS: TabDef<ParasiteViewScale>[] = [
   { id: 'environment', label: 'Soil', icon: '🌱' },
   { id: 'tissue', label: 'Tissue', icon: '🫀' },
+  { id: 'slice', label: 'Cyst garden', icon: '🍇' },
   { id: 'cell', label: 'Cell / PV', icon: '🔬' },
   { id: 'organelle', label: 'Organelle', icon: '🧫' },
   { id: 'sandbox', label: 'Lytic cycle', icon: '🔁' },

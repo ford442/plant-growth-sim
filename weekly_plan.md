@@ -120,6 +120,7 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 #### C4 — Multi-scale R3F views — [#6](https://github.com/ford442/plant-growth-sim/issues/6) ✅
 - [x] Environment / soil oocyst field  
 - [x] Tissue view with cysts (5–70 µm growth) and instanced zoites + traction rings  
+- [x] Cyst garden (tissue slice): hex host-cell mosaic, cysts at real µm with fresnel wall rim, bradyzoite crescents under a LOD budget, scale bar, hover tooltip, tissue palette picker — 5 draw calls at 200 cysts / ~20 k bradyzoites; instancing guard + adaptive LOD borrowed from ford442/watershed  
 - [x] Single-cell PV with rosette, junction ring and PLP1 pores  
 - [x] Organelle close-up (22 MTs, 14-fibre conoid, apicoplast, rhoptries, micronemes)  
 
@@ -175,6 +176,7 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ## Last updated
 
+- **2026-11-22** — Parasite C4 first slice: the **Cyst garden** tab (`TissueSliceView`, `slice/*`, `SlicePanels`, `sliceViewStore`). Four instanced meshes + underlay (5 draw calls) at 200 cysts / ~20 k bradyzoites, LOD tiers with adaptive stepping, `?stress=200` / `?lod=` switches. GPU frame rate not yet measured on real hardware.
 - **2026-11-20** — Gem #12 Phase 4 landed: `src/simulation/SoilField.ts` (soil water + silica/calcite field, roots, cement, nodules) drives plant water status and calcium nutrition; the Roots tab is a real soil slice (`soil/SoilView`, `SoilPanel`) with geodes that open in gem mode.
 - **2026-11-20** — Plant #13 landed: the Cellular tab is a real stem cross-section (`src/simulation/TissueGrowth.ts`, `CellularView`, `TissuePanel`) with animated mitosis / expansion, growth rings and weather-driven division. Gem and parasite modes untouched.
 - **2026-11-19** — Track C landed end to end: C0 design lock (`docs/design/parasite-mode.md`), C1–C5 implemented in `src/simulation/parasite/` + `parasiteStore` + `ParasiteViewer`, 51 unit tests. Plant and gem modes untouched.

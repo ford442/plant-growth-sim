@@ -1080,3 +1080,71 @@
   .lytic-step { flex: 0 0 calc(25% - 0.2rem); }
   .lytic-detail { flex-direction: column; gap: 0.15rem; }
 }
+
+/* ------------------------------------------------------------------------ */
+/* Cyst garden (parasite tissue slice)                                      */
+/* ------------------------------------------------------------------------ */
+.slice-scalebar {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 7px 11px 6px;
+  background: rgba(7, 16, 20, 0.78);
+  border: 1px solid #1b3741;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  color: #bfeae2;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+/* the rule, with end ticks, the way a micrograph draws one */
+.slice-scalebar-rule {
+  position: relative;
+  height: 0;
+  border-top: 2px solid #cdfff5;
+}
+.slice-scalebar-rule::before,
+.slice-scalebar-rule::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  width: 2px;
+  height: 10px;
+  background: #cdfff5;
+}
+.slice-scalebar-rule::before { left: -1px; }
+.slice-scalebar-rule::after { right: -1px; }
+
+.slice-tooltip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  min-width: 190px;
+  padding: 0.55rem 0.7rem;
+  background: rgba(7, 16, 20, 0.94);
+  border: 1px solid #2a5663;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+}
+.slice-tooltip.show { opacity: 1; }
+.slice-tooltip-title { font-weight: 600; margin-bottom: 0.4rem; }
+.slice-tooltip-title.growing { color: #93d8ca; }
+.slice-tooltip-title.mature { color: #c4b5fd; }
+
+.slice-panel .toggle { margin: 0.1rem 0 0.55rem; }
+.slice-tier-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.22rem;
+  margin: 0.4rem 0 0.5rem;
+}
+.slice-tier-row .niche-btn { justify-content: center; }

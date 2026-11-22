@@ -26,13 +26,16 @@ import {
 import { crescentGeometry, hideInstance, orientInstance } from './parasite/bodyGeometry'
 import { OrganelleView } from './parasite/OrganelleView'
 import { CellSandboxView } from './parasite/CellSandboxView'
+import { TissueSliceView } from './parasite/TissueSliceView'
 
-export type ParasiteViewScale = 'environment' | 'tissue' | 'cell' | 'organelle' | 'sandbox'
+export type ParasiteViewScale = 'environment' | 'tissue' | 'slice' | 'cell' | 'organelle' | 'sandbox'
 
 /** World units per micrometre, per view. */
 const UNIT: Record<ParasiteViewScale, number> = {
   environment: 0.075,
   tissue: 0.105,
+  // 1 µm = 0.05 units: a 15 µm host cell is 0.75 units, a 70 µm cyst 3.5, a 7 µm bradyzoite 0.35
+  slice: 0.05,
   cell: 0.17,
   organelle: 1,
   sandbox: 0.12,
@@ -41,6 +44,7 @@ const UNIT: Record<ParasiteViewScale, number> = {
 export const PARASITE_VIEW_TARGET: Record<ParasiteViewScale, [number, number, number]> = {
   environment: [0, 0, 0],
   tissue: [0, 0, 0],
+  slice: [0, 0, 0],
   cell: [0, 0, 0],
   organelle: [0, 0, 0],
   sandbox: [0, 0, 0],
@@ -54,6 +58,8 @@ export const PARASITE_VIEW_TARGET: Record<ParasiteViewScale, [number, number, nu
 const VIEW_DISTANCE: Record<ParasiteViewScale, number> = {
   environment: 11,
   tissue: 15.5,
+  // ~330 µm of tissue across the view: a handful of cyst plots, the zoom wheel does the rest
+  slice: 20,
   cell: 9,
   organelle: 9.5,
   sandbox: 10.5,
@@ -67,6 +73,8 @@ const VIEW_DISTANCE: Record<ParasiteViewScale, number> = {
 const VIEW_DIRECTION: Record<ParasiteViewScale, [number, number, number]> = {
   environment: [0.15, 0.55, 1],
   tissue: [0.15, 0.4, 1],
+  // from well above, so the section reads as a plane and the cysts as domes standing in it
+  slice: [0.2, 0.85, 0.55],
   cell: [0.15, 0.4, 1],
   organelle: [1, 0.3, 0.42],
   // looking down onto the dish, so the glide trail and the host dome both read
@@ -695,6 +703,11 @@ export function ParasiteViewer({ scale }: { scale: ParasiteViewScale }) {
   return (
     <group>
       {scale === 'tissue' && inHost && <TissueScene />}
+      {scale === 'slice' && inHost && (
+        <group scale={UNIT.slice}>
+          <TissueSliceView />
+        </group>
+      )}
       {scale === 'cell' && inHost && <CellScene />}
       {scale === 'environment' && <EnvironmentScene />}
       {/* the lytic sandbox is its own experiment: it does not need a host in the world */}

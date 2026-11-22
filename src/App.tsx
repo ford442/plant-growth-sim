@@ -30,6 +30,7 @@ import {
   type ParasiteViewScale,
 } from './components/ParasiteViewer'
 import { LyticPanel, LyticTimeline } from './components/parasite/LyticPanels'
+import { SliceOverlay, SlicePanel } from './components/parasite/SlicePanels'
 import { useSimStore } from './stores/simStore'
 import { useModeStore } from './stores/modeStore'
 import { useTimeStore } from './stores/timeStore'
@@ -185,6 +186,7 @@ function App() {
 
           {isParasite && <ParasiteViewportHint scale={parasiteScale} />}
           {isParasite && parasiteScale === 'sandbox' && <LyticTimeline />}
+          {isParasite && parasiteScale === 'slice' && <SliceOverlay />}
           {!isParasite && !isGem && scale === 'cellular' && <TissueHud />}
 
           {/* Overlay HUD */}
@@ -229,6 +231,7 @@ function App() {
             <>
               <ObjectivePanel />
               <HostPanel />
+              {parasiteScale === 'slice' && <SlicePanel />}
               <ParasiteInfoPanel scale={parasiteScale} />
             </>
           ) : isGem ? (
