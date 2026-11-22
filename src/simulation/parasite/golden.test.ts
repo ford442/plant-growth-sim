@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { activateAbility, ABILITY_IDS, type AbilityId } from './abilities'
 import { FIXED_STEP_CLOCKS } from './fixedStep'
 import { DEFAULT_MODIFIERS } from './modifiers'
+import { evaluateObjective, reservoirCysts, type ObjectiveProgress } from './objectives'
+import type { StressLevers } from './hostImmunity'
 import {
   createWorld,
   DEFAULT_CONFIG,
@@ -84,27 +87,27 @@ describe('golden runs (seed 42)', () => {
       {
         "actionSeconds": 320,
         "agentsByStage": {
-          "tachyzoite": 56,
+          "tachyzoite": 12,
         },
         "bradyzoitesInCysts": 0,
-        "clearances": 0,
+        "clearances": 4,
         "compartment": "intermediateTissue",
         "conversions": 0,
         "cysts": 0,
-        "failedInvasions": 5,
+        "failedInvasions": 9,
         "hostCells": {
-          "healthy": 6,
-          "invaded": 14,
+          "healthy": 8,
+          "invaded": 12,
           "lysed": 4,
         },
-        "hostHealth": 0.969,
-        "inVacuoles": 24,
+        "hostHealth": 0.975,
+        "inVacuoles": 17,
         "lesionHours": 72,
         "lyticCycles": 4,
         "oocysts": {},
-        "overflow": 48.797,
+        "overflow": 0.153,
         "reactivations": 0,
-        "rngSeed": 616405612,
+        "rngSeed": 2258046621,
       }
     `)
   })
@@ -206,5 +209,165 @@ describe('golden runs (seed 42)', () => {
     const a = census(run(createWorld(DEFAULT_CONFIG, 42), DEFAULT_CONFIG, STEPS_72H))
     const b = census(run(createWorld(DEFAULT_CONFIG, 43), DEFAULT_CONFIG, STEPS_72H))
     expect(b.rngSeed).not.toBe(a.rngSeed)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scripted game runs (epic #3, issue #5/#7)
+// ---------------------------------------------------------------------------
+
+/**
+ * A scripted player. `stressAt` is the lesion hour at which the player pushes
+ * the stress levers; `rotate` is the set of abilities fired greedily, in order,
+ * the moment each comes off cooldown — the simplest competent play pattern, and
+ * the one a new player converges on.
+ *
+ * These are the acceptance tests for the objective being *winnable and losable
+ * both ways*: the same seed and the same world, three decisions, three
+ * different endings. If a retune moves them, the mode now plays differently,
+ * which is exactly what a golden test is for.
+ */
+interface Play {
+  stressAt?: number
+  stress?: StressLevers
+  rotate?: AbilityId[]
+  /** Hold the abilities until this lesion hour. */
+  from?: number
+}
+
+const PUSH: StressLevers = { alkaline: 0.8, starvation: 0.3, heatShock: 0 }
+
+function playOut(play: Play, seed = 42, maxDays = 40) {
+  let config: ParasiteConfig = cfg()
+  let w = createWorld(config, seed)
+  let progress: ObjectiveProgress = evaluateObjective('latentPassage', w, config)
+  const steps = Math.round((maxDays * 24) / FIXED_STEP_CLOCKS.lesion)
+
+  for (let i = 0; i < steps && progress.status === 'active'; i++) {
+    if (play.stressAt !== undefined && Math.abs(w.lesionHours - play.stressAt) < FIXED_STEP_CLOCKS.lesion / 2) {
+      config = { ...config, stress: play.stress ?? PUSH }
+    }
+    if (play.rotate && w.lesionHours >= (play.from ?? 0)) {
+      for (const id of play.rotate) {
+        const next = activateAbility(w.abilities, id, config.effectors, w.tally.conversions)
+        if (next !== w.abilities) w = { ...w, abilities: next }
+      }
+    }
+    w = stepWorld(w, config, FIXED_STEP_CLOCKS)
+    progress = evaluateObjective('latentPassage', w, config)
+  }
+
+  return {
+    status: progress.status,
+    reason: progress.reason,
+    day: round3(w.lesionHours / 24),
+    reservoirCysts: reservoirCysts(w, config.tuning),
+    cysts: w.cysts.filter((c) => c.intact).length,
+    hostHealth: round3(w.host.health),
+    conversions: w.tally.conversions,
+    clearances: w.tally.clearances,
+    cellsLysed: Math.round(w.tally.cellsLysed),
+    abilityUses: Object.fromEntries(ABILITY_IDS.map((id) => [id, w.abilities[id].uses])),
+    rngSeed: w.rng.seed,
+  }
+}
+
+describe('scripted game runs (seed 42)', () => {
+  it('wins: secrete the effectors, then push stress once there is something to encyst', () => {
+    const out = playOut({ stressAt: 48, rotate: ABILITY_IDS })
+    expect(out.status).toBe('won')
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "abilityUses": {
+          "rop16": 14,
+          "rop18rop5": 23,
+          "tgist": 7,
+        },
+        "cellsLysed": 1,
+        "clearances": 0,
+        "conversions": 10,
+        "cysts": 10,
+        "day": 30.001,
+        "hostHealth": 1,
+        "reason": "Latency established. The host will carry these cysts for life.",
+        "reservoirCysts": 9,
+        "rngSeed": 3491551511,
+        "status": "won",
+      }
+    `)
+  })
+
+  it('loses by killing the host: effectors but no stress, so nothing ever encysts', () => {
+    const out = playOut({ rotate: ABILITY_IDS })
+    expect(out.status).toBe('lost')
+    expect(out.reason).toMatch(/host/i)
+    expect(out.reservoirCysts).toBe(0)
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "abilityUses": {
+          "rop16": 12,
+          "rop18rop5": 20,
+          "tgist": 5,
+        },
+        "cellsLysed": 78,
+        "clearances": 231,
+        "conversions": 5,
+        "cysts": 0,
+        "day": 26.321,
+        "hostHealth": 0.2,
+        "reason": "Host health collapsed below the floor — acute disease, not latency.",
+        "reservoirCysts": 0,
+        "rngSeed": 468482689,
+        "status": "lost",
+      }
+    `)
+  })
+
+  it('loses by being cleared: no effectors, no stress, the host wins the acute phase', () => {
+    const out = playOut({})
+    expect(out.status).toBe('lost')
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "abilityUses": {
+          "rop16": 0,
+          "rop18rop5": 0,
+          "tgist": 0,
+        },
+        "cellsLysed": 10,
+        "clearances": 27,
+        "conversions": 6,
+        "cysts": 6,
+        "day": 30.001,
+        "hostHealth": 1,
+        "reason": "Day 30 with 5 of 8 reservoir cysts — the window for a chronic infection closed.",
+        "reservoirCysts": 5,
+        "rngSeed": 2557162297,
+        "status": "lost",
+      }
+    `)
+  })
+
+  it('loses on a late push: the vacuoles are already stripped by the time stress arrives', () => {
+    const out = playOut({ stressAt: 120, rotate: ABILITY_IDS })
+    expect(out.status).toBe('lost')
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "abilityUses": {
+          "rop16": 14,
+          "rop18rop5": 23,
+          "tgist": 6,
+        },
+        "cellsLysed": 15,
+        "clearances": 44,
+        "conversions": 13,
+        "cysts": 5,
+        "day": 30.001,
+        "hostHealth": 1,
+        "reason": "Day 30 with 5 of 8 reservoir cysts — the window for a chronic infection closed.",
+        "reservoirCysts": 5,
+        "rngSeed": 858878891,
+        "status": "lost",
+      }
+    `)
   })
 })

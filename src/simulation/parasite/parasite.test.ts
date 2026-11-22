@@ -23,17 +23,27 @@ import {
   MJ_PHASE_DEFS,
   stepInvasion,
 } from './invasion'
-import { createHostState, parasiteStress, stepHost, vacuolePressure } from './hostImmunity'
+import {
+  createHostState,
+  parasiteStress,
+  stepHost,
+  vacuolePressure,
+  type NicheId,
+} from './hostImmunity'
 import { nextTransition } from './lifeCycleGraph'
 import { createRng, distV, lengthV } from './math'
 import { DEFAULT_MODIFIERS, PARASITE_SPECIES, resolveModifiers } from './modifiers'
 import {
   evaluateObjective,
+  isReservoirCyst,
   LATENT_TARGET,
   objectiveBlocked,
+  reservoirCysts,
+  RESERVOIR_NICHES,
   RUNAWAY_TARGET,
   WINTER_TARGET_DAYS,
 } from './objectives'
+import { DEFAULT_TUNING } from './tuning'
 import {
   advanceClocks,
   cystDiameter,
@@ -50,11 +60,14 @@ import {
   createWorld,
   DEFAULT_CONFIG,
   enterFelidGut,
+  parasiteExtinct,
   seedEnvironment,
   shedToEnvironment,
   stepWorld,
   TISSUE_RADIUS,
+  type Cyst,
   type ParasiteConfig,
+  type ParasiteWorld,
 } from './world'
 
 const cfg = (over: Partial<ParasiteConfig> = {}): ParasiteConfig => ({
@@ -565,6 +578,35 @@ describe('world', () => {
 
 // ---------------------------------------------------------------------------
 describe('objectives', () => {
+  /** A world holding `n` cysts of `diameter` µm in `niche`, at day `day`. */
+  function withCysts(
+    base: ParasiteWorld,
+    n: number,
+    opts: { diameter?: number; niche?: NicheId; day?: number; health?: number } = {},
+  ): ParasiteWorld {
+    const diameter = opts.diameter ?? DEFAULT_TUNING.matureDiameterUm
+    const niche = opts.niche ?? 'cnsCortex'
+    const cysts: Cyst[] = Array.from({ length: n }, (_, i) => ({
+      id: 1000 + i,
+      niche,
+      pos: { x: 0, y: 0, z: 0 },
+      diameter,
+      wall: 0.4,
+      bradyzoites: 512,
+      ageHours: 500,
+      bfd: { bfd1: 1, bfd2: 1, locked: true, everLocked: true, committedHours: 400 },
+      divisionTimer: 0,
+      intact: true,
+    }))
+    return {
+      ...base,
+      lesionHours: (opts.day ?? 0) * 24,
+      host: { ...base.host, health: opts.health ?? 0.8 },
+      cysts,
+      tally: { ...base.tally, cysts: n, matureCysts: n },
+    }
+  }
+
   it('starts active and reports progress toward the latency target', () => {
     const c = cfg()
     const w = createWorld(c, 1)
@@ -583,17 +625,119 @@ describe('objectives', () => {
     expect(p.reason).toMatch(/died/i)
   })
 
-  it('wins the latency objective on enough mature cysts with a live host', () => {
+  it('loses the latency objective when the host is merely dying, not yet dead', () => {
     const c = cfg()
     const w = createWorld(c, 1)
-    const won = {
-      ...w,
-      host: { ...w.host, health: 0.8 },
-      tally: { ...w.tally, matureCysts: LATENT_TARGET, cysts: LATENT_TARGET },
+    const sick = { ...w, host: { ...w.host, health: c.tuning.hostFloor } }
+    const p = evaluateObjective('latentPassage', sick, c)
+    expect(p.status).toBe('lost')
+    expect(p.reason).toMatch(/floor/i)
+  })
+
+  it('only counts intact, well-grown cysts in CNS or muscle as reservoir', () => {
+    const tuning = DEFAULT_TUNING
+    const base: Cyst = {
+      id: 1,
+      niche: 'cnsCortex',
+      pos: { x: 0, y: 0, z: 0 },
+      diameter: tuning.matureDiameterUm,
+      wall: 0.4,
+      bradyzoites: 512,
+      ageHours: 1,
+      bfd: { bfd1: 1, bfd2: 1, locked: true, everLocked: true, committedHours: 1 },
+      divisionTimer: 0,
+      intact: true,
     }
-    const p = evaluateObjective('latentPassage', won, c)
+    expect(isReservoirCyst(base, tuning)).toBe(true)
+    // one short of the diameter, ruptured, or in the retina: none of them count
+    expect(isReservoirCyst({ ...base, diameter: tuning.matureDiameterUm - 0.1 }, tuning)).toBe(false)
+    expect(isReservoirCyst({ ...base, intact: false }, tuning)).toBe(false)
+    expect(isReservoirCyst({ ...base, niche: 'retina' }, tuning)).toBe(false)
+    for (const niche of RESERVOIR_NICHES) {
+      expect(isReservoirCyst({ ...base, niche }, tuning)).toBe(true)
+    }
+  })
+
+  it('does not win before the window closes, however many cysts are banked', () => {
+    const c = cfg()
+    const w = withCysts(createWorld(c, 1), c.tuning.latentTarget * 2, { day: c.tuning.holdDays - 1 })
+    const p = evaluateObjective('latentPassage', w, c)
+    expect(reservoirCysts(w, c.tuning)).toBeGreaterThan(c.tuning.latentTarget)
+    expect(p.status).toBe('active')
+    // the cyst half of the bar is full, the time half is not
+    expect(p.progress).toBeGreaterThan(0.9)
+    expect(p.progress).toBeLessThan(1)
+  })
+
+  it('wins at the deadline on enough reservoir cysts with a live host', () => {
+    const c = cfg()
+    const w = withCysts(createWorld(c, 1), c.tuning.latentTarget, { day: c.tuning.holdDays })
+    const p = evaluateObjective('latentPassage', w, c)
     expect(p.status).toBe('won')
     expect(p.progress).toBe(1)
+    expect(p.reason).toMatch(/latency established/i)
+  })
+
+  it('loses at the deadline when the reservoir is one cyst short', () => {
+    const c = cfg()
+    const w = withCysts(createWorld(c, 1), c.tuning.latentTarget - 1, { day: c.tuning.holdDays })
+    const p = evaluateObjective('latentPassage', w, c)
+    expect(p.status).toBe('lost')
+    expect(p.reason).toMatch(/window/i)
+  })
+
+  it('does not count retinal cysts toward the win, and says so', () => {
+    const c = cfg()
+    const w = withCysts(createWorld(c, 1), c.tuning.latentTarget, { day: c.tuning.holdDays, niche: 'retina' })
+    const p = evaluateObjective('latentPassage', w, c)
+    expect(p.status).toBe('lost')
+    expect(p.detail.join(' ')).toMatch(/retinal/i)
+  })
+
+  it('loses the latency objective the moment the host clears the lineage', () => {
+    const c = cfg()
+    const w = createWorld(c, 1)
+    const cleared: ParasiteWorld = {
+      ...w,
+      lesionHours: 24 * 5,
+      agents: [],
+      overflow: 0,
+      cells: w.cells.map((cell) => ({ ...cell, pv: null })),
+      cysts: [],
+      oocysts: [],
+      oocystsReady: 0,
+    }
+    expect(parasiteExtinct(cleared)).toBe(true)
+    const p = evaluateObjective('latentPassage', cleared, c)
+    expect(p.status).toBe('lost')
+    expect(p.reason).toMatch(/cleared/i)
+  })
+
+  it('does not call a lineage extinct while a cyst or a fraction of the pool survives', () => {
+    const c = cfg()
+    const w = createWorld(c, 1)
+    const bare: ParasiteWorld = {
+      ...w,
+      agents: [],
+      overflow: 0,
+      cells: w.cells.map((cell) => ({ ...cell, pv: null })),
+      cysts: [],
+      oocysts: [],
+      oocystsReady: 0,
+    }
+    // one intact cyst *is* latency, which is what the objective wants
+    expect(parasiteExtinct(withCysts(bare, 1))).toBe(false)
+    // a whole parasite still in the aggregate pool counts; a fraction does not
+    expect(parasiteExtinct({ ...bare, overflow: 1 })).toBe(false)
+    expect(parasiteExtinct({ ...bare, overflow: 0.4 })).toBe(true)
+  })
+
+  it('reads its thresholds from the config, so the debug panel can retune a live run', () => {
+    const w = withCysts(createWorld(cfg(), 1), 3, { day: 10 })
+    const strict = cfg({ tuning: { ...DEFAULT_TUNING, latentTarget: 8, holdDays: 30 } })
+    const lenient = cfg({ tuning: { ...DEFAULT_TUNING, latentTarget: 3, holdDays: 10 } })
+    expect(evaluateObjective('latentPassage', w, strict).status).toBe('active')
+    expect(evaluateObjective('latentPassage', w, lenient).status).toBe('won')
   })
 
   it('wins the runaway objective on lytic cycles, loses it on host death', () => {

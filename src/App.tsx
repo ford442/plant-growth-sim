@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, Stats } from '@react-three/drei'
 import { PlantViewer, PLANT_VIEW_TARGET } from './components/PlantViewer'
@@ -12,6 +12,14 @@ import { GemInfoPanel } from './components/GemInfoPanel'
 import { SpeciesSelector } from './components/SpeciesSelector'
 import { GemstoneSelector } from './components/GemstoneSelector'
 import { ParasiteSelector } from './components/ParasiteSelector'
+import { GameHud, ObjectiveModal } from './components/parasite/GameHud'
+/**
+ * `?debug=1` adds a Leva panel for the objective thresholds. Lazy, so `leva`
+ * is fetched only when the switch is on and stays out of the default bundle.
+ */
+const TuningPanel = lazy(() => import('./components/parasite/TuningPanel'))
+const DEBUG_TUNING =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug')
 import {
   HostPanel,
   ObjectivePanel,
@@ -184,6 +192,17 @@ function App() {
           </Canvas>
           )}
 
+          {isParasite && parasiteScale !== 'sandbox' && (
+            <>
+              <GameHud />
+              <ObjectiveModal />
+              {DEBUG_TUNING && (
+                <Suspense fallback={null}>
+                  <TuningPanel />
+                </Suspense>
+              )}
+            </>
+          )}
           {isParasite && <ParasiteViewportHint scale={parasiteScale} />}
           {isParasite && parasiteScale === 'sandbox' && <LyticTimeline />}
           {isParasite && parasiteScale === 'slice' && <SliceOverlay />}

@@ -40,6 +40,12 @@ import {
   type Compartment,
 } from './stages'
 import {
+  activeEffectors,
+  createAbilityStates,
+  stepAbilities,
+  type AbilityStates,
+} from './abilities'
+import {
   canReactivate,
   createBfdState,
   effectiveImmunity,
@@ -84,6 +90,7 @@ import {
   type StressLevers,
 } from './hostImmunity'
 import { nextTransition } from './lifeCycleGraph'
+import { DEFAULT_TUNING, type GameTuning } from './tuning'
 import {
   DEFAULT_MODIFIERS,
   PARASITE_SPECIES,
@@ -238,6 +245,8 @@ export interface ParasiteWorld {
   /** Biomechanical clock, action seconds. */
   actionSeconds: number
   host: HostState
+  /** Cooldown/duration state of the player's secreted effectors. */
+  abilities: AbilityStates
   agents: Agent[]
   cells: HostCell[]
   cysts: Cyst[]
@@ -270,6 +279,8 @@ export interface ParasiteConfig {
   moisture: number
   /** Player-forced egress of every vacuole. */
   forceEgress: boolean
+  /** Win/lose thresholds for the objective layer (`tuning.ts`). */
+  tuning: GameTuning
 }
 
 export const DEFAULT_CONFIG: ParasiteConfig = {
@@ -282,6 +293,7 @@ export const DEFAULT_CONFIG: ParasiteConfig = {
   temperature: 22,
   moisture: 0.6,
   forceEgress: false,
+  tuning: { ...DEFAULT_TUNING },
 }
 
 function emptyTally(): Tally {
@@ -360,6 +372,7 @@ export function createWorld(cfg: ParasiteConfig = DEFAULT_CONFIG, seed = 2026081
     lesionHours: 0,
     actionSeconds: 0,
     host: createHostState(cfg.immunosuppression),
+    abilities: createAbilityStates(),
     agents,
     cells,
     cysts: [],
@@ -417,6 +430,15 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
   const dtH = clocks.lesion
   if (dtA <= 0 && dtH <= 0) return world
 
+  /**
+   * What the host feels this step: the strain's carried effector genes AND the
+   * abilities that are actually secreting. Never `cfg.effectors` on its own —
+   * that is the genotype, not the current secretion (`abilities.ts`).
+   */
+  const effectors = activeEffectors(cfg.effectors, world.abilities)
+  // the abilities the *next* step sees; this step runs on what was active during it
+  const abilities = stepAbilities(world.abilities, dtH)
+
   const rng = forkRng(world)
   const scratch: StepScratch = {
     log: world.log.slice(),
@@ -455,6 +477,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
       rng,
       lesionHours,
       actionSeconds: world.actionSeconds + dtA,
+      abilities,
       oocysts,
       tally,
       log: scratch.log,
@@ -473,7 +496,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
 
   // 1. host cells and their vacuoles
   for (const cell of cells) {
-    cell.pressure = vacuolePressure(world.host, cell.niche, cfg.effectors)
+    cell.pressure = vacuolePressure(world.host, cell.niche, effectors)
 
     if (cell.state === 'lysed') {
       cell.lysedHours += dtH
@@ -487,7 +510,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
     const pv = cell.pv
     if (!pv) continue
 
-    const stress = parasiteStress(world.host, cell.niche, cfg.stress, cfg.effectors)
+    const stress = parasiteStress(world.host, cell.niche, cfg.stress, effectors)
 
     // IRG-driven clearance of the vacuole — the shield is already folded into
     // `pressure` via ROP18/ROP5.
@@ -759,8 +782,11 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
     agents.push(agent)
   }
 
-  // refill the scene from the overflow pool as slots free up
-  while (overflow > 0 && agents.length + spawned.length < MAX_AGENTS) {
+  // Refill the scene from the overflow pool as slots free up. The pool is a
+  // fractional aggregate (immunity eats a fraction of it per step), so a whole
+  // parasite has to be there to draw — `> 0` would hand a slot to a 0.3 of a
+  // parasite and leave the pool negative.
+  while (overflow >= 1 && agents.length + spawned.length < MAX_AGENTS) {
     const dir = normalizeV({ x: nextRange(rng, -1, 1), y: nextRange(rng, -1, 1), z: nextRange(rng, -1, 1) })
     spawned.push(
       makeAgent(scratch.nextId++, 'tachyzoite', scaleV(dir, TISSUE_RADIUS * 0.7), rng),
@@ -777,7 +803,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
   // 3. cysts
   for (const cyst of cysts) {
     cyst.ageHours += dtH
-    const stress = parasiteStress(world.host, cyst.niche, cfg.stress, cfg.effectors)
+    const stress = parasiteStress(world.host, cyst.niche, cfg.stress, effectors)
     cyst.bfd = stepBfd(cyst.bfd, {
       stress,
       dtHours: dtH,
@@ -834,7 +860,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
     {
       load,
       lysedThisStep: scratch.lysedThisStep,
-      effectors: cfg.effectors,
+      effectors,
       dtHours: dtH,
     },
   )
@@ -865,6 +891,7 @@ export function stepWorld(world: ParasiteWorld, cfg: ParasiteConfig, clocks: Clo
     lesionHours,
     actionSeconds: world.actionSeconds + dtA,
     host,
+    abilities,
     agents,
     cells,
     cysts,
@@ -1117,6 +1144,26 @@ function appendLog(world: ParasiteWorld, kind: EventKind, text: string): SimEven
   log.push({ id: world.nextId, hour: world.lesionHours, kind, text })
   if (log.length > 48) log.splice(0, log.length - 48)
   return log
+}
+
+/**
+ * Is there no parasite left anywhere in this world? The "too passive" loss: the
+ * host cleared the acute infection and no cyst was banked before it did.
+ *
+ * An intact cyst counts as alive even with every tachyzoite gone — that *is*
+ * latency, and it is the state the primary objective is trying to reach. Only
+ * when the vacuoles, the free parasites, the overflow aggregate, the cysts, the
+ * gut's waiting zygotes and the soil's viable oocysts are all empty has the
+ * lineage actually ended.
+ */
+export function parasiteExtinct(world: ParasiteWorld): boolean {
+  if (world.agents.length > 0) return false
+  // the aggregate is fractional; less than one parasite is none
+  if (world.overflow >= 1) return false
+  if (world.cells.some((c) => c.pv !== null)) return false
+  if (world.cysts.some((c) => c.intact)) return false
+  if (world.oocystsReady > 0) return false
+  return !world.oocysts.some((o) => o.viability > 0)
 }
 
 /** Which passage is available from the current state, if any. */

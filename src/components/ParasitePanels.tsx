@@ -31,6 +31,11 @@ import type { ParasiteViewScale } from './ParasiteViewer'
 
 const pct = (x: number) => `${Math.round(x * 100)}%`
 
+/**
+ * The effector *loci* this strain carries. Unticking one is a knockout for the
+ * whole run; whether a carried effector is being secreted at this moment is the
+ * ability button in the viewport HUD (`parasite/GameHud.tsx`).
+ */
 const EFFECTOR_LABELS: { key: keyof EffectorFlags; name: string; detail: string }[] = [
   { key: 'rop16', name: 'ROP16', detail: 'Phosphorylates STAT3/6 → M2 macrophages, ↓IL-12, ↓NO, ↓ROS' },
   { key: 'rop18rop5', name: 'ROP18 + ROP5', detail: 'Blocks IRG oligomerisation on the vacuole membrane' },
@@ -181,7 +186,7 @@ export function HostPanel() {
             />
           </div>
 
-          <div className="status-label">Secreted effectors</div>
+          <div className="status-label">Effector genes carried</div>
           <div className="toggle-column">
             {EFFECTOR_LABELS.map((e) => (
               <label className="toggle" key={e.key} title={e.detail}>
@@ -193,6 +198,10 @@ export function HostPanel() {
                 {e.name}
               </label>
             ))}
+          </div>
+          <div className="gem-note">
+            Untick one to run the knockout. Secreting them is the ability row in the viewport — each
+            acts for a few lesion hours, then recharges.
           </div>
 
           <div className="status-label">Niche focus</div>
