@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { createCrystalState, type CrystalState } from '../simulation/CrystalGrowth'
 import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
-import { advancePlant, createSeedling, type PlantSnapshot } from '../simulation/clock'
+import { advanceClock, createSeedling } from '../simulation/clock'
+import { createPlot, focusFields, plantIndividual, stepGarden, syncFocus, type GardenSnapshot, type Individual } from '../simulation/plot'
 import { createSoilState, type SoilProfileId, type SoilState } from '../simulation/SoilField'
 import type { TissueState } from '../simulation/TissueGrowth'
 import { useTimeStore } from './timeStore'
@@ -23,6 +24,15 @@ export interface SimState {
   // identity
   species: SpeciesId
   setSpecies: (s: SpeciesId) => void
+
+  // the bed (simulation/plot.ts): every individual under the same weather and clock.
+  // The top-level plant fields below mirror the focused one; `tick` keeps its slot in sync.
+  plot: Individual[]
+  focusId: string
+  /** Focus another individual: its fields become the top-level plant. Time does not move. */
+  setFocus: (id: string) => void
+  /** Replant the focused slot as a new seedling of `species`; the rest of the bed keeps growing. */
+  replantFocus: (species: SpeciesId) => void
 
   // time (play/pause + speed live in timeStore, shared by every mode)
   time: number // simulation days
@@ -88,8 +98,10 @@ const defaultGemstone: GemstoneId = 'quartz'
 const defaultSoil: SoilProfileId = 'loam'
 
 /** The slice of store state one plant step reads and writes (no actions). */
-function snapshotOf(s: SimState): PlantSnapshot {
+function snapshotOf(s: SimState): GardenSnapshot {
   return {
+    plot: s.plot,
+    focusId: s.focusId,
     species: s.species,
     soilProfile: s.soilProfile,
     gemstone: s.gemstone,
@@ -111,6 +123,7 @@ function snapshotOf(s: SimState): PlantSnapshot {
 }
 
 const seedling = createSeedling('sunflower', defaultSoil)
+const plot0 = createPlot('sunflower')
 
 export const useSimStore = create<SimState>((set, get) => ({
   species: 'sunflower',
@@ -118,12 +131,30 @@ export const useSimStore = create<SimState>((set, get) => ({
   // physiology table; SpeciesSelector follows it with reset() to start the new seedling
   setSpecies: (species) => set({ species }),
 
+  plot: plot0,
+  focusId: plot0[0].id,
+  setFocus: (id) => {
+    const s = get()
+    if (id === s.focusId) return
+    const plot = syncFocus(s.plot, s.focusId, s)
+    const target = plot.find((p) => p.id === id)
+    if (!target) return
+    set({ plot, focusId: id, ...focusFields(target) })
+  },
+  replantFocus: (species) => {
+    const s = get()
+    const slot = s.plot.findIndex((p) => p.id === s.focusId)
+    const fresh = plantIndividual(slot, species)
+    set({ plot: s.plot.map((p, i) => (i === slot ? fresh : p)), ...focusFields(fresh) })
+  },
+
   time: seedling.time,
   clockAccumulator: 0,
   tick: (dt) => {
     const { isPlaying, speed } = useTimeStore.getState()
     const before = get()
-    const r = advancePlant(snapshotOf(before), before.clockAccumulator, { dt, speed, playing: isPlaying })
+    // the whole bed on the one clock: every individual, once per fixed step
+    const r = advanceClock(snapshotOf(before), stepGarden, before.clockAccumulator, { dt, speed, playing: isPlaying })
     if (r.steps === 0) {
       // paused, or less than one step owed: only the part-step bookkeeping may have moved
       if (r.accumulator !== before.clockAccumulator) set({ clockAccumulator: r.accumulator })
@@ -134,7 +165,9 @@ export const useSimStore = create<SimState>((set, get) => ({
   reset: () => {
     useTimeStore.getState().play()
     const { species, soilProfile } = get()
-    set({ ...createSeedling(species, soilProfile), clockAccumulator: 0 })
+    const plot = createPlot(species)
+    // slot 0 is the focus after a reset; its tissue seed matches createSeedling's default
+    set({ ...createSeedling(species, soilProfile), plot, focusId: plot[0].id, tissue: plot[0].tissue, clockAccumulator: 0 })
   },
 
   weather: defaultWeather,

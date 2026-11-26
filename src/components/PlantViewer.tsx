@@ -4,7 +4,8 @@ import * as THREE from 'three'
 import { useSimStore } from '../stores/simStore'
 import { SPECIES_LSYSTEMS } from '../simulation/LSystem'
 import { morphFactor } from '../simulation/LSystemMorph'
-import type { ViewScale } from '../App'
+import { SCALE_CAMERA, type ViewScale } from '../simulation/scales'
+import { BedView } from './plant/BedView'
 import { registerPlantRoot } from './plantExport'
 import { CellularView } from './CellularView'
 import { getMorphedPlant, type MorphedPlant } from './plant/MorphedPlant'
@@ -20,12 +21,22 @@ interface Props {
   soilFlow?: boolean
 }
 
-/** Orbit target per plant view: the Roots view looks into the soil. */
-export const PLANT_VIEW_TARGET: Record<ViewScale, [number, number, number]> = {
-  macro: [0, 0, 0],
-  architecture: [0, 0, 0],
-  cellular: [0, 0, 0],
-  roots: [0, -0.7, 0],
+/**
+ * Puts the shared camera where `SCALE_CAMERA` says for this scale: position, fov and
+ * near/far (orbit target + limits are props on <OrbitControls/> in App). Rendered
+ * before the view, so a view's own rig (the cellular one refits the distance) runs after it.
+ */
+function PlantCameraRig({ scale }: { scale: ViewScale }) {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
+  useEffect(() => {
+    const c = SCALE_CAMERA[scale]
+    camera.position.set(...c.position)
+    camera.fov = c.fov
+    camera.near = c.near
+    camera.far = c.far
+    camera.updateProjectionMatrix()
+  }, [camera, scale])
+  return null
 }
 
 // Both layers are re-posed in place every frame by <ArchitectureView/> (see
@@ -146,37 +157,10 @@ function ArchitectureView({ ground = true }: { ground?: boolean }) {
 
 /** The plant above ground and the soil slice it draws on below. */
 function RootsView({ overlay, flow }: { overlay: SoilOverlay; flow: boolean }) {
-  // look at the slice face-on (the default camera looks down on the plant);
-  // put the camera back on the way out so the other views keep their framing
-  const camera = useThree((s) => s.camera)
-  useEffect(() => {
-    const before = camera.position.clone()
-    camera.position.set(0.6, 0.4, 7.2)
-    return () => {
-      camera.position.copy(before)
-    }
-  }, [camera])
-
   return (
     <group>
       <ArchitectureView ground={false} />
       <SoilView overlay={overlay} flow={flow} />
-    </group>
-  )
-}
-
-function MacroView() {
-  // Multiple plants for garden feel
-  return (
-    <group>
-      <ArchitectureView />
-      {/* a couple of background plants */}
-      <group position={[2.2, 0, -1.5]} scale={0.7}>
-        <ArchitectureView />
-      </group>
-      <group position={[-2.5, 0, -0.8]} scale={0.55}>
-        <ArchitectureView />
-      </group>
     </group>
   )
 }
@@ -186,7 +170,8 @@ export function PlantViewer({ scale, soilOverlay = 'moisture', soilFlow = true }
   // Root group is registered so the UI can export the on-screen scene as GLB.
   return (
     <group ref={registerPlantRoot} name="plant-scene">
-      {scale === 'macro' && <MacroView />}
+      <PlantCameraRig scale={scale} />
+      {scale === 'macro' && <BedView />}
       {scale === 'architecture' && <ArchitectureView />}
       {scale === 'cellular' && <CellularView />}
       {scale === 'roots' && <RootsView overlay={soilOverlay} flow={soilFlow} />}
