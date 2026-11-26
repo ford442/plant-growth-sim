@@ -114,6 +114,8 @@ const seedling = createSeedling('sunflower', defaultSoil)
 
 export const useSimStore = create<SimState>((set, get) => ({
   species: 'sunflower',
+  // the stepper reads `species` from the state it steps, so this is also the swap of the
+  // physiology table; SpeciesSelector follows it with reset() to start the new seedling
   setSpecies: (species) => set({ species }),
 
   time: seedling.time,

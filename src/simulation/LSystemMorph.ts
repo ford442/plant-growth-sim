@@ -50,9 +50,18 @@ export const DAYS_PER_ITERATION = 3
  * relative growth rate (0–1, the same factor that scales biomass and height),
  * so architecture develops in lockstep with growth: it slows with the weather,
  * stops when growth stops, and follows pause / speed through `days`.
+ *
+ * A species passes its own `daysPerIteration` and `ceiling` (`physiology.ts`);
+ * the defaults are the global pace and {@link MAX_ITERATIONS}.
  */
-export function advanceDevelopment(progress: number, days: number, rate: number): number {
-  return Math.min(MAX_ITERATIONS, progress + (days * rate) / DAYS_PER_ITERATION)
+export function advanceDevelopment(
+  progress: number,
+  days: number,
+  rate: number,
+  daysPerIteration = DAYS_PER_ITERATION,
+  ceiling = MAX_ITERATIONS,
+): number {
+  return Math.min(ceiling, progress + (days * rate) / daysPerIteration)
 }
 
 /** Whole iteration shown at the start of the morph that `progress` is in. */

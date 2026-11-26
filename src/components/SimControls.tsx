@@ -8,6 +8,7 @@ import { useLyticStore } from '../stores/lyticStore'
 import { GEMSTONE_PRESETS } from '../simulation/GemstonePresets'
 import { SPECIES_LSYSTEMS, architectureStats } from '../simulation/LSystem'
 import { MAX_ITERATIONS } from '../simulation/LSystemMorph'
+import { SPECIES_PHYSIOLOGY, growthFactors, type LimitingFactor } from '../simulation/physiology'
 import { specimenMetrics } from '../simulation/CrystalGrowth'
 import { ACTION_SECONDS_PER_SECOND, LESION_HOURS_PER_SECOND, REFERENCE_SPEED } from '../simulation/parasite/stages'
 
@@ -120,6 +121,7 @@ export function SimControls() {
           <span className="stat-label">Growth</span>
           <span className="stat-value">{growthRate.toFixed(3)}</span>
         </div>
+        <PlantLimits />
         {architecture.simplified && (
           <div className="stat-label" title={`Drawn at iteration ${architecture.iterations} (${architecture.segments} segments) to stay interactive`}>
             Architecture simplified
@@ -128,6 +130,42 @@ export function SimControls() {
       </div>
       )}
     </div>
+  )
+}
+
+const LIMIT_LABEL: Record<LimitingFactor, string> = {
+  cold: 'cold',
+  heat: 'heat',
+  dark: 'dark',
+  drought: 'drought',
+  wind: 'wind',
+  nutrient: 'nutrients',
+  none: 'none',
+}
+
+/** The species' optimum and ceiling, and whatever is holding growth back right now (live from the weather sliders). */
+function PlantLimits() {
+  const species = useSimStore((s) => s.species)
+  const weather = useSimStore((s) => s.weather)
+  const water = useSimStore((s) => s.waterStatus)
+  const nutrient = useSimStore((s) => s.nutrientStatus)
+  const p = SPECIES_PHYSIOLOGY[species]
+  const f = growthFactors(species, weather, water, nutrient)
+  return (
+    <>
+      <div className="stat">
+        <span className="stat-label">Optimum</span>
+        <span className="stat-value">
+          {p.tOpt} °C · max {p.heightMax} m
+        </span>
+      </div>
+      <div className="stat" title="The weakest of temperature, light, water, wind and nutrition; 'none' when all are above 90 %">
+        <span className="stat-label">Limiting</span>
+        <span className="stat-value">
+          {LIMIT_LABEL[f.limiting]} · {(f.rate * 100).toFixed(0)} %
+        </span>
+      </div>
+    </>
   )
 }
 
