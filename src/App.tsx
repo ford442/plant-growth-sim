@@ -47,7 +47,14 @@ import { useLyticStore } from './stores/lyticStore'
 import { LYTIC_PHASE_DEFS, lyticSettled } from './simulation/parasite/lytic/sandbox'
 import { useRendererStore } from './stores/rendererStore'
 import { RendererPanel } from './components/RendererPanel'
-import { RendererLifecycle, backendForMode, rendererFactory, useGraphicsCapability } from './rendering'
+import {
+  KEY_LIGHT_SHADOW,
+  RendererLifecycle,
+  backendForMode,
+  configureOutput,
+  rendererFactory,
+  useGraphicsCapability,
+} from './rendering'
 import { GEMSTONE_PRESETS } from './simulation/GemstonePresets'
 import { SOIL_PROFILES } from './simulation/SoilField'
 import { COMPARTMENT_LABEL } from './simulation/parasite/stages'
@@ -140,6 +147,11 @@ function App() {
             camera={{ position: [0, 4, 8], fov: 45 }}
             dpr={[1, 2]}
             gl={rendererFactory({ backend, capability })}
+            // creates the shadow map; only lights that set `castShadow` use it (plant mode's key light).
+            // 'percentage' = PCFShadowMap: R3F's bare `shadows` asks for PCFSoft, removed in three r186
+            shadows="percentage"
+            // after R3F's own defaults, so the tone mapping / colour space named in createRenderer.ts win
+            onCreated={({ gl }) => configureOutput(gl)}
           >
             <RendererLifecycle onDeviceLost={remountCanvas} onActive={setActiveRenderer} />
             <color attach="background" args={[bg]} />
@@ -153,8 +165,18 @@ function App() {
                 <directionalLight
                   position={[8, 12, 5]}
                   intensity={1.2}
-                  castShadow
-                  shadow-mapSize={[1024, 1024]}
+                  // plant mode only: the plant casts onto the ground disk. Gem has no ground to
+                  // shadow and its meshes were never set up for it; parasite lights live elsewhere
+                  castShadow={!isGem}
+                  shadow-mapSize={KEY_LIGHT_SHADOW.mapSize}
+                  shadow-camera-left={-KEY_LIGHT_SHADOW.extent}
+                  shadow-camera-right={KEY_LIGHT_SHADOW.extent}
+                  shadow-camera-top={KEY_LIGHT_SHADOW.extent}
+                  shadow-camera-bottom={-KEY_LIGHT_SHADOW.extent}
+                  shadow-camera-near={KEY_LIGHT_SHADOW.near}
+                  shadow-camera-far={KEY_LIGHT_SHADOW.far}
+                  shadow-bias={KEY_LIGHT_SHADOW.bias}
+                  shadow-normalBias={KEY_LIGHT_SHADOW.normalBias}
                 />
                 <hemisphereLight args={isGem ? ['#b8c8ff', '#2a2433', 0.4] : ['#87ceeb', '#2d4a2d', 0.4]} />
               </>

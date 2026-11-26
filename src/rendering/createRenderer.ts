@@ -35,6 +35,77 @@ export interface RendererOptions {
   capability: GraphicsCapability
 }
 
+/**
+ * Every flag the app relies on when the GL context is created. They cannot be
+ * changed afterwards (a canvas keeps the attributes of its first context), so
+ * this is the one place to read them. `powerPreference` and
+ * `failIfMajorPerformanceCaveat` come from the capability probe instead
+ * (`probeGraphicsCapability.ts`: `high-performance` on a capable GPU).
+ */
+export const CONTEXT_FLAGS = {
+  /** MSAA on the default framebuffer: branches and leaf edges alias badly without it. */
+  antialias: true,
+  /** Opaque canvas. Each mode paints its own `<color attach="background">`, and no mode composites over the page. */
+  alpha: false,
+  /** Depth buffer on: every scene needs it. */
+  depth: true,
+  /** Off until something needs a stencil (e.g. a clip plane or section cap); saves memory and a clear. */
+  stencil: false,
+  /**
+   * Logarithmic depth, so one camera can span a garden (tens of metres) and a
+   * cell (tens of microns) without z-fighting. It has to be chosen here, not
+   * patched onto materials later. Costs: fragment depth is written in the
+   * shader, which defeats early-z, and a hand-written `ShaderMaterial` must
+   * include the `logdepthbuf_*` chunks or its depth will not match its neighbours
+   * (see `parasite/slice/wallShader.ts`).
+   */
+  logarithmicDepthBuffer: true,
+} as const
+
+/**
+ * Output pipeline, named rather than inherited. R3F would pick ACES filmic and
+ * sRGB anyway (R3F 9 / three r186 defaults); stating them keeps `Environment`
+ * lighting and every mode's look independent of a library default changing.
+ */
+export const OUTPUT = {
+  toneMapping: THREE.ACESFilmicToneMapping,
+  toneMappingExposure: 1,
+  outputColorSpace: THREE.SRGBColorSpace,
+} as const
+
+/**
+ * Shadow map used by the plant mode's key light. `<Canvas shadows>` turns the
+ * map machinery on; a light only costs anything if it sets `castShadow`, so
+ * modes with nothing to cast on (gem, parasite) leave it off.
+ * The frustum is sized for the plant view (ground disk radius 3.5, plants that
+ * outgrow the frame — see AGENTS.md "Known issue").
+ */
+export const KEY_LIGHT_SHADOW = {
+  mapSize: [1024, 1024] as [number, number],
+  /** Half-width of the orthographic shadow frustum, world units. */
+  extent: 8,
+  near: 1,
+  far: 40,
+  /** Thin instanced cylinders self-shadow ("acne") without a small bias. */
+  bias: -0.0005,
+  normalBias: 0.02,
+} as const
+
+/**
+ * Apply {@link OUTPUT} to a renderer. Pass it as (or call it from) `<Canvas onCreated>`,
+ * which runs after R3F has applied its own defaults. Idempotent.
+ */
+export function configureOutput(renderer: unknown): void {
+  const r = renderer as {
+    toneMapping: THREE.ToneMapping
+    toneMappingExposure: number
+    outputColorSpace: string
+  }
+  r.toneMapping = OUTPUT.toneMapping
+  r.toneMappingExposure = OUTPUT.toneMappingExposure
+  r.outputColorSpace = OUTPUT.outputColorSpace
+}
+
 /** Returns an R3F-compatible `gl` prop: `gl={rendererFactory(opts)}`. */
 export function rendererFactory({ backend, capability }: RendererOptions): GLProps {
   const { antialias, powerPreference, failIfMajorPerformanceCaveat } = capability.envelope
@@ -49,6 +120,10 @@ export function rendererFactory({ backend, capability }: RendererOptions): GLPro
         const renderer = new WebGPURenderer({
           canvas,
           antialias,
+          alpha: CONTEXT_FLAGS.alpha,
+          depth: CONTEXT_FLAGS.depth,
+          stencil: CONTEXT_FLAGS.stencil,
+          logarithmicDepthBuffer: CONTEXT_FLAGS.logarithmicDepthBuffer,
           powerPreference: powerPreference === 'default' ? undefined : powerPreference,
           forceWebGL: !capability.webgpu,
         })
@@ -66,8 +141,7 @@ export function rendererFactory({ backend, capability }: RendererOptions): GLPro
     return new THREE.WebGLRenderer({
       canvas,
       // plant/gem always asked for MSAA; keep that regardless of probe tier
-      antialias: true,
-      alpha: false,
+      ...CONTEXT_FLAGS,
       powerPreference,
       failIfMajorPerformanceCaveat,
     })
