@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { SPECIES_LSYSTEMS, leafSpec, type LeafSpec } from '../../simulation/LSystem'
+import { SPECIES_LSYSTEMS, architectureCap, leafSpec, type LeafSpec } from '../../simulation/LSystem'
+import type { SpeciesId } from '../../simulation/species'
 import {
   LEAF_STRIDE,
   MAX_ITERATIONS,
@@ -147,8 +148,10 @@ const plants = new Map<string, MorphedPlant>() // insertion order = least → mo
  * strings, lineage and geometry are the expensive part and only happen when the
  * stage steps, never per frame.
  */
-export function getMorphedPlant(species: string, stage: number): MorphedPlant {
-  const n = Math.max(0, Math.min(MAX_ITERATIONS, Math.floor(stage)))
+export function getMorphedPlant(species: SpeciesId, stage: number): MorphedPlant {
+  const def = SPECIES_LSYSTEMS[species] ?? SPECIES_LSYSTEMS.sunflower
+  // past the species' segment budget every stage draws the same capped plant: share one entry
+  const n = Math.max(0, Math.min(architectureCap(def, MAX_ITERATIONS), Math.floor(stage)))
   const key = `${species}:${n}`
 
   const hit = plants.get(key)
@@ -158,7 +161,6 @@ export function getMorphedPlant(species: string, stage: number): MorphedPlant {
     return hit
   }
 
-  const def = SPECIES_LSYSTEMS[species] ?? SPECIES_LSYSTEMS.sunflower
   let builder = builders.get(species)
   if (!builder) {
     builder = createMorphBuilder(def)

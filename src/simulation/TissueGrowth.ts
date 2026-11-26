@@ -30,7 +30,7 @@
  * with `layoutFile` and paints the stem disc from `ringProfile`.
  */
 
-import type { SpeciesId } from '../stores/simStore'
+import type { SpeciesId } from './species'
 
 // ---------------------------------------------------------------------------
 // Constants (µm unless noted)

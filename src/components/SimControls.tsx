@@ -6,6 +6,8 @@ import { useModeStore } from '../stores/modeStore'
 import { useParasiteStore } from '../stores/parasiteStore'
 import { useLyticStore } from '../stores/lyticStore'
 import { GEMSTONE_PRESETS } from '../simulation/GemstonePresets'
+import { SPECIES_LSYSTEMS, architectureStats } from '../simulation/LSystem'
+import { MAX_ITERATIONS } from '../simulation/LSystemMorph'
 import { specimenMetrics } from '../simulation/CrystalGrowth'
 import { ACTION_SECONDS_PER_SECOND, LESION_HOURS_PER_SECOND, REFERENCE_SPEED } from '../simulation/parasite/stages'
 
@@ -29,6 +31,11 @@ export function SimControls() {
   const biomass = useSimStore((s) => s.biomass)
   const growthRate = useSimStore((s) => s.growthRate)
   const species = useSimStore((s) => s.species)
+  const stage = useSimStore((s) => s.lsystemIterations)
+  const architecture = useMemo(
+    () => architectureStats(SPECIES_LSYSTEMS[species], stage, MAX_ITERATIONS),
+    [species, stage],
+  )
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
@@ -113,6 +120,11 @@ export function SimControls() {
           <span className="stat-label">Growth</span>
           <span className="stat-value">{growthRate.toFixed(3)}</span>
         </div>
+        {architecture.simplified && (
+          <div className="stat-label" title={`Drawn at iteration ${architecture.iterations} (${architecture.segments} segments) to stay interactive`}>
+            Architecture simplified
+          </div>
+        )}
       </div>
       )}
     </div>

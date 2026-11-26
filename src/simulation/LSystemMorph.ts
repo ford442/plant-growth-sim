@@ -32,6 +32,7 @@
  * simulation itself never sees the interpolation factor.
  */
 import {
+  architectureCap,
   generateLSystem,
   interpretLSystem,
   type LSystemDef,
@@ -330,7 +331,7 @@ function staticMorph(iterations: number, g: Generation): LSystemMorph {
 }
 
 export interface MorphBuilder {
-  /** The morph from `iterations` to `iterations + 1` (a static pose at MAX_ITERATIONS). */
+  /** The morph from `iterations` to `iterations + 1` (a static pose at the species' budget cap, `architectureCap`). */
   morph(iterations: number): LSystemMorph
 }
 
@@ -340,6 +341,7 @@ export interface MorphBuilder {
  */
 export function createMorphBuilder(def: LSystemDef): MorphBuilder {
   const gens = new Map<number, Generation>()
+  const cap = architectureCap(def, MAX_ITERATIONS)
 
   const generation = (n: number, str?: string) => {
     let g = gens.get(n)
@@ -352,10 +354,10 @@ export function createMorphBuilder(def: LSystemDef): MorphBuilder {
 
   return {
     morph(iterations) {
-      const n = Math.max(0, Math.min(MAX_ITERATIONS, Math.floor(iterations)))
+      const n = Math.max(0, Math.min(cap, Math.floor(iterations)))
       const a = generation(n)
       let result: LSystemMorph
-      if (n >= MAX_ITERATIONS) {
+      if (n >= cap) {
         result = staticMorph(n, a)
       } else {
         const { next, parent } = rewriteWithParents(a.str, def.rules)
