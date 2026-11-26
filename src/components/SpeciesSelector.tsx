@@ -11,8 +11,8 @@ const SPECIES: { id: SpeciesId; label: string; emoji: string }[] = [
 
 export function SpeciesSelector() {
   const species = useSimStore((s) => s.species)
-  const setSpecies = useSimStore((s) => s.setSpecies)
-  const reset = useSimStore((s) => s.reset)
+  // replants the focused slot only; the rest of the bed keeps growing
+  const replantFocus = useSimStore((s) => s.replantFocus)
 
   return (
     <div className="species-selector">
@@ -21,8 +21,7 @@ export function SpeciesSelector() {
           key={sp.id}
           className={`species-btn ${species === sp.id ? 'active' : ''}`}
           onClick={() => {
-            setSpecies(sp.id)
-            reset()
+            replantFocus(sp.id)
           }}
           title={sp.label}
         >

@@ -1364,3 +1364,16 @@
   border-color: #1b3741;
   color: #6f9aa0;
 }
+
+/* Bed (plot) list */
+.bed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.bed-row {
+  width: 100%; display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
+  padding: 5px 8px; background: #0f1a0f; border: 1px solid #1f331f; border-radius: 6px;
+  color: #a8c8a8; font-size: 12px; cursor: pointer; text-align: left;
+}
+.bed-row:hover { border-color: #3d6b3d; }
+.bed-row.active { border-color: #6fbf6f; background: #142614; color: #d8f0d8; }
+.bed-name { text-transform: capitalize; }
+.bed-stat { font-variant-numeric: tabular-nums; color: #7fa07f; }
+.bed-hint { margin: 6px 0 0; font-size: 11px; color: #5f7f5f; }

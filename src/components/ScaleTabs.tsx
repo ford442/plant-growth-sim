@@ -1,4 +1,4 @@
-import type { ViewScale } from '../App'
+import type { ViewScale } from '../simulation/scales'
 import type { GemViewScale } from './CrystalViewer'
 import type { ParasiteViewScale } from './ParasiteViewer'
 

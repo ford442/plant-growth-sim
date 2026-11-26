@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, Stats } from '@react-three/drei'
-import { PlantViewer, PLANT_VIEW_TARGET } from './components/PlantViewer'
+import { PlantViewer } from './components/PlantViewer'
+import { BedPanel } from './components/BedPanel'
 import { SoilPanel } from './components/SoilPanel'
 import type { SoilOverlay } from './components/soil/palette'
 import { CrystalViewer, GemLightformers, GEM_VIEW_TARGET, type GemViewOptions, type GemViewScale } from './components/CrystalViewer'
@@ -58,9 +59,9 @@ import {
 import { GEMSTONE_PRESETS } from './simulation/GemstonePresets'
 import { SOIL_PROFILES } from './simulation/SoilField'
 import { COMPARTMENT_LABEL } from './simulation/parasite/stages'
+import { SCALE_CAMERA, type ViewScale } from './simulation/scales'
 import './App.css'
 
-export type ViewScale = 'macro' | 'architecture' | 'cellular' | 'roots'
 
 const STATUS_HUD: Record<string, string> = {
   growing: 'GROWING',
@@ -200,10 +201,10 @@ function App() {
                   ? PARASITE_VIEW_TARGET[parasiteScale]
                   : isGem
                     ? GEM_VIEW_TARGET[gemScale]
-                    : PLANT_VIEW_TARGET[scale]
+                    : SCALE_CAMERA[scale].target
               }
-              minDistance={1.5}
-              maxDistance={isParasite ? 45 : 30}
+              minDistance={!isParasite && !isGem ? SCALE_CAMERA[scale].minDistance : 1.5}
+              maxDistance={isParasite ? 45 : isGem ? 30 : SCALE_CAMERA[scale].maxDistance}
               maxPolarAngle={isParasite ? Math.PI : Math.PI * 0.85}
               enableDamping
               dampingFactor={0.08}
@@ -284,6 +285,7 @@ function App() {
             </>
           ) : (
             <>
+              <BedPanel />
               <WeatherPanel />
               <RendererPanel />
               {scale === 'cellular' && <TissuePanel />}
