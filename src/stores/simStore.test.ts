@@ -93,13 +93,19 @@ describe('architecture development (L-system progress)', () => {
     expect(sim().lsystemProgress - MIN_ITERATIONS).toBeLessThan(wet)
   })
 
-  it('reset() returns to the first stage; setLsystemIterations keeps both fields consistent', () => {
+  it('reset() returns to the first stage', () => {
     for (let i = 0; i < 40; i++) sim().tick(0.1)
     sim().reset()
     expect(sim().lsystemProgress).toBe(MIN_ITERATIONS)
-    sim().setLsystemIterations(5)
-    expect(sim().lsystemProgress).toBe(5)
-    expect(sim().lsystemIterations).toBe(5)
+    expect(sim().lsystemIterations).toBe(MIN_ITERATIONS)
+  })
+
+  it('the iteration count is derived: no public setter, and it is the whole part of progress', () => {
+    expect('setLsystemIterations' in sim()).toBe(false)
+    for (let i = 0; i < 100; i++) {
+      sim().tick(0.1)
+      expect(sim().lsystemIterations).toBe(Math.floor(sim().lsystemProgress))
+    }
   })
 })
 
@@ -123,7 +129,12 @@ describe('soil coupling', () => {
   it('calcium nutrition scales growth like water does', () => {
     useSimStore.setState({ nutrientStatus: 0.5 })
     sim().tick(0.1)
-    expect(sim().lsystemProgress).toBeCloseTo(MIN_ITERATIONS + (0.5 * 0.1) / DAYS_PER_ITERATION, 8)
+    // 0.1 days is three fixed steps now, and nutrition relaxes towards the soil between
+    // them, so this is no longer exact — but it must still sit at ≈ half the full rate
+    const dp = sim().lsystemProgress - MIN_ITERATIONS
+    const full = 0.1 / DAYS_PER_ITERATION
+    expect(dp).toBeGreaterThan(0.5 * full)
+    expect(dp).toBeLessThan(0.52 * full)
   })
 
   it('switching the soil rebuilds the soil field; reset() rebuilds it too', () => {

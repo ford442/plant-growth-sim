@@ -179,7 +179,7 @@ function MacroView() {
   )
 }
 
-// The simulation tick lives in <SimClock /> (shared with the gem viewer).
+// The simulation tick lives in <SimClock /> (outside the Canvas, shared by every mode).
 export function PlantViewer({ scale, soilOverlay = 'moisture', soilFlow = true }: Props) {
   // Root group is registered so the UI can export the on-screen scene as GLB.
   return (
