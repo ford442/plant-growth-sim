@@ -127,6 +127,9 @@ function App() {
         )}
       </header>
 
+      {/* one clock for every mode, outside the Canvas so a remount never forks or stops it */}
+      <SimClock />
+
       <div className="main">
         {/* 3D Viewport */}
         <div className="viewport">
@@ -157,8 +160,6 @@ function App() {
               </>
             )}
 
-            {/* one clock for every mode — keeps the Zustand tick loop intact */}
-            <SimClock />
             {isParasite ? (
               <>
                 <ParasiteCameraRig scale={parasiteScale} />

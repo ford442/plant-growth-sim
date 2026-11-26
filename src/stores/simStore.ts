@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import { createCrystalState, stepCrystal, type CrystalState } from '../simulation/CrystalGrowth'
+import { createCrystalState, type CrystalState } from '../simulation/CrystalGrowth'
 import { GEMSTONE_PRESETS, type GemstoneId, type GeologyState } from '../simulation/GemstonePresets'
-import { advanceDevelopment, MIN_ITERATIONS, stageOf } from '../simulation/LSystemMorph'
-import { createSoilState, stepSoil, type SoilProfileId, type SoilState } from '../simulation/SoilField'
-import { createTissueState, stepTissue, type TissueState } from '../simulation/TissueGrowth'
+import { advancePlant, createSeedling, type PlantSnapshot } from '../simulation/clock'
+import { createSoilState, type SoilProfileId, type SoilState } from '../simulation/SoilField'
+import type { TissueState } from '../simulation/TissueGrowth'
 import { useTimeStore } from './timeStore'
 
 export type { GemstoneId, GeologyState, SoilProfileId }
@@ -31,7 +31,14 @@ export interface SimState {
 
   // time (play/pause + speed live in timeStore, shared by every mode)
   time: number // simulation days
+  /**
+   * Spend `dt` real seconds on the shared clock (`simulation/clock.ts`): the frame is
+   * clamped, accumulated and run as fixed steps. Called from exactly one place — the
+   * driver in `clockDriver.ts`.
+   */
   tick: (dt: number) => void
+  /** Part of a fixed step already owed, in [0, 1); carried between frames by `tick`. */
+  clockAccumulator: number
   reset: () => void
 
   // weather
@@ -50,10 +57,9 @@ export interface SimState {
   // stage — it advances with the weather-driven growth rate, so branching slows, stalls
   // and resumes together with height/biomass. The view blends generation
   // floor(progress) into the next by its fractional part (see LSystemMorph.ts), while
-  // `lsystemIterations` stays the whole-iteration count (= floor(progress)).
+  // `lsystemIterations` is that count's whole part, derived by the stepper (nothing sets it).
   lsystemProgress: number
   lsystemIterations: number
-  setLsystemIterations: (n: number) => void
 
   // stem tissue (cambium / xylem / phloem cell files; the cellular view derives its geometry from this)
   tissue: TissueState
@@ -85,106 +91,74 @@ const defaultWeather: WeatherState = {
 
 const defaultGemstone: GemstoneId = 'quartz'
 const defaultSoil: SoilProfileId = 'loam'
-/** Days for plant water / nutrition to follow the soil (hydraulic + tissue buffering). */
-const WATER_LAG_DAYS = 1
-const NUTRIENT_LAG_DAYS = 3
+
+/** The slice of store state one plant step reads and writes (no actions). */
+function snapshotOf(s: SimState): PlantSnapshot {
+  return {
+    species: s.species,
+    soilProfile: s.soilProfile,
+    gemstone: s.gemstone,
+    geology: s.geology,
+    weather: s.weather,
+    time: s.time,
+    age: s.age,
+    height: s.height,
+    biomass: s.biomass,
+    waterStatus: s.waterStatus,
+    nutrientStatus: s.nutrientStatus,
+    growthRate: s.growthRate,
+    lsystemProgress: s.lsystemProgress,
+    lsystemIterations: s.lsystemIterations,
+    tissue: s.tissue,
+    soil: s.soil,
+    crystal: s.crystal,
+  }
+}
+
+const seedling = createSeedling('sunflower', defaultSoil)
 
 export const useSimStore = create<SimState>((set, get) => ({
   species: 'sunflower',
   setSpecies: (species) => set({ species }),
 
-  time: 0,
+  time: seedling.time,
+  clockAccumulator: 0,
   tick: (dt) => {
     const { isPlaying, speed } = useTimeStore.getState()
-    const { species, weather, waterStatus, nutrientStatus, gemstone, geology, lsystemProgress, soilProfile } = get()
-    if (!isPlaying) return
-
-    const days = dt * speed
-    // very simple growth model for now
-    const tempFactor = Math.max(0, 1 - Math.abs(weather.temperature - 22) / 25)
-    const lightFactor = weather.light
-    const waterFactor = waterStatus
-    // relative growth rate (0-1): scales biomass/height and, through advanceDevelopment,
-    // how fast the architecture develops, so the two can never drift apart
-    const rate = tempFactor * lightFactor * waterFactor * nutrientStatus
-    const growth = days * 0.08 * rate
-    const progress = advanceDevelopment(lsystemProgress, days, rate)
-
-    set((s) => {
-      // roots draw on the soil; the soil decides how much of the demand they meet
-      const soil = stepSoil(
-        s.soil,
-        soilProfile,
-        weather,
-        { species, biomass: s.biomass, growth: rate, activity: tempFactor * waterStatus },
-        days
-      )
-      return {
-      time: s.time + days,
-      age: s.age + days,
-      height: Math.min(s.height + growth * 0.35, 4.5),
-      biomass: s.biomass + growth,
-      waterStatus: Math.max(
-        0.05,
-        Math.min(1, s.waterStatus + (soil.supply - s.waterStatus) * (1 - Math.exp(-days / WATER_LAG_DAYS)))
-      ),
-      nutrientStatus: Math.min(
-        1,
-        s.nutrientStatus + (soil.nutrient - s.nutrientStatus) * (1 - Math.exp(-days / NUTRIENT_LAG_DAYS))
-      ),
-      soil,
-      growthRate: growth / Math.max(days, 0.001),
-      lsystemProgress: progress,
-      lsystemIterations: stageOf(progress),
-      // cambium divides on the same clock, driven by the same weather and turgor
-      tissue: stepTissue(
-        s.tissue,
-        species,
-        { temperature: weather.temperature, light: weather.light, water: waterStatus },
-        days
-      ),
-      // crystals share the same clock (days), so plant and gem modes coexist
-      crystal: stepCrystal(s.crystal, gemstone, geology, days),
-      }
-    })
+    const before = get()
+    const r = advancePlant(snapshotOf(before), before.clockAccumulator, { dt, speed, playing: isPlaying })
+    if (r.steps === 0) {
+      // paused, or less than one step owed: only the part-step bookkeeping may have moved
+      if (r.accumulator !== before.clockAccumulator) set({ clockAccumulator: r.accumulator })
+      return
+    }
+    set({ ...r.state, clockAccumulator: r.accumulator })
   },
   reset: () => {
     useTimeStore.getState().play()
-    set({
-      time: 0,
-      age: 0,
-      height: 0.15,
-      biomass: 0.1,
-      waterStatus: 0.85,
-      nutrientStatus: 1,
-      growthRate: 0,
-      lsystemProgress: MIN_ITERATIONS,
-      lsystemIterations: MIN_ITERATIONS,
-      tissue: createTissueState(get().species),
-      soil: createSoilState(get().soilProfile, get().species),
-    })
+    const { species, soilProfile } = get()
+    set({ ...createSeedling(species, soilProfile), clockAccumulator: 0 })
   },
 
   weather: defaultWeather,
   setWeather: (partial) =>
     set((s) => ({ weather: { ...s.weather, ...partial } })),
 
-  age: 0,
-  height: 0.15,
-  biomass: 0.1,
-  waterStatus: 0.85,
-  nutrientStatus: 1,
-  growthRate: 0,
+  age: seedling.age,
+  height: seedling.height,
+  biomass: seedling.biomass,
+  waterStatus: seedling.waterStatus,
+  nutrientStatus: seedling.nutrientStatus,
+  growthRate: seedling.growthRate,
 
-  lsystemProgress: MIN_ITERATIONS,
-  lsystemIterations: MIN_ITERATIONS,
-  setLsystemIterations: (n) => set({ lsystemProgress: n, lsystemIterations: stageOf(n) }),
+  lsystemProgress: seedling.lsystemProgress,
+  lsystemIterations: seedling.lsystemIterations,
 
-  tissue: createTissueState('sunflower'),
+  tissue: seedling.tissue,
 
   soilProfile: defaultSoil,
   setSoilProfile: (soilProfile) => set((s) => ({ soilProfile, soil: createSoilState(soilProfile, s.species) })),
-  soil: createSoilState(defaultSoil, 'sunflower'),
+  soil: seedling.soil,
 
   gemstone: defaultGemstone,
   setGemstone: (gemstone) => {
