@@ -37,6 +37,7 @@ function Branches({ plant, color }: { plant: MorphedPlant; color: string }) {
       key={plant.key}
       args={[undefined, undefined, plant.segmentCount]}
       frustumCulled={false}
+      castShadow
     >
       <primitive object={plant.branchMatrices} attach="instanceMatrix" />
       {/* shared between plants, so a primitive: R3F must not dispose it on unmount */}
@@ -60,6 +61,7 @@ function Leaves({ plant, color, nodeMaterial }: LeavesProps) {
       key={plant.key}
       args={[undefined, undefined, plant.leafCount]}
       frustumCulled={false}
+      castShadow
     >
       <primitive object={plant.leafMatrices} attach="instanceMatrix" />
       {/* shared between plants, so a primitive: R3F must not dispose it on unmount */}

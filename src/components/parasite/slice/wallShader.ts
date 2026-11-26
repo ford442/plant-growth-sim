@@ -11,7 +11,12 @@
  * Scale is uniform, so the instance matrix can transform normals directly.
  */
 
+// The renderer uses a logarithmic depth buffer (`CONTEXT_FLAGS` in rendering/createRenderer.ts), so
+// this shader must write log depth like every built-in material or the shells would be depth-tested
+// against values on the wrong scale. The chunks need `common` first.
 export const WALL_VERTEX = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_vertex>
 varying vec3 vNormalView;
 varying vec3 vViewDir;
 varying vec3 vTint;
@@ -32,10 +37,13 @@ void main() {
     vTint = vec3(1.0);
   #endif
   gl_Position = projectionMatrix * mv;
+  #include <logdepthbuf_vertex>
 }
 `
 
 export const WALL_FRAGMENT = /* glsl */ `
+#include <common>
+#include <logdepthbuf_pars_fragment>
 uniform float uPower;
 uniform float uIntensity;
 varying vec3 vNormalView;
@@ -43,6 +51,7 @@ varying vec3 vViewDir;
 varying vec3 vTint;
 
 void main() {
+  #include <logdepthbuf_fragment>
   float facing = clamp(abs(dot(normalize(vNormalView), normalize(vViewDir))), 0.0, 1.0);
   float rim = pow(1.0 - facing, uPower);
   // additive blending: the shell adds light, it never darkens what is behind it
