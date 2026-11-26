@@ -199,9 +199,9 @@ npm run dev
 
 ### Phase 0 – Scaffold (now)
 - [x] Repo + README
-- [ ] Vite + React + TS + R3F + WebGPU setup
-- [ ] Basic L-system tree + flower that grows over time
-- [ ] Weather panel (temp, light, water)
+- [x] Vite + React + TS + R3F + WebGPU setup
+- [x] Basic L-system tree + flower that grows over time
+- [x] Weather panel (temp, light, water)
 
 ### Phase 1 – Core Simulation
 - [ ] Functional-structural growth (biomass allocation)
