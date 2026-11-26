@@ -1,0 +1,101 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`architecture IR is deterministic > pins segment counts and endpoint checksums at iteration 2 and the cap 1`] = `
+{
+  "bamboo@2": {
+    "checksum": "92293cc8",
+    "segments": 25,
+  },
+  "bamboo@5": {
+    "checksum": "788f83d5",
+    "segments": 3125,
+  },
+  "fern@2": {
+    "checksum": "22dbf79a",
+    "segments": 18,
+  },
+  "fern@6": {
+    "checksum": "15bd665f",
+    "segments": 6048,
+  },
+  "ivy@2": {
+    "checksum": "a1d659ab",
+    "segments": 12,
+  },
+  "ivy@7": {
+    "checksum": "17961303",
+    "segments": 3279,
+  },
+  "oak@2": {
+    "checksum": "5a15ee98",
+    "segments": 10,
+  },
+  "oak@7": {
+    "checksum": "3269f2d9",
+    "segments": 4118,
+  },
+  "rose@2": {
+    "checksum": "95e5dedb",
+    "segments": 18,
+  },
+  "rose@6": {
+    "checksum": "e67ae672",
+    "segments": 6048,
+  },
+  "sunflower@2": {
+    "checksum": "49fd11cb",
+    "segments": 10,
+  },
+  "sunflower@7": {
+    "checksum": "78650393",
+    "segments": 4118,
+  },
+}
+`;
+
+exports[`architecture budget > pins the capped iteration and counts per species 1`] = `
+{
+  "bamboo": {
+    "iterations": 5,
+    "leaves": 1563,
+    "segments": 3125,
+    "simplified": true,
+    "symbols": 7811,
+  },
+  "fern": {
+    "iterations": 6,
+    "leaves": 4096,
+    "segments": 6048,
+    "simplified": true,
+    "symbols": 25159,
+  },
+  "ivy": {
+    "iterations": 7,
+    "leaves": 2187,
+    "segments": 3279,
+    "simplified": false,
+    "symbols": 12024,
+  },
+  "oak": {
+    "iterations": 7,
+    "leaves": 2187,
+    "segments": 4118,
+    "simplified": false,
+    "symbols": 12863,
+  },
+  "rose": {
+    "iterations": 6,
+    "leaves": 4096,
+    "segments": 6048,
+    "simplified": true,
+    "symbols": 25159,
+  },
+  "sunflower": {
+    "iterations": 7,
+    "leaves": 2187,
+    "segments": 4118,
+    "simplified": false,
+    "symbols": 13956,
+  },
+}
+`;

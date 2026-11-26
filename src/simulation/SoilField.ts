@@ -40,7 +40,7 @@
  * can be watched alongside the plant.
  */
 
-import type { SpeciesId } from '../stores/simStore'
+import type { SpeciesId } from './species'
 import { growthLaw, rand } from './CrystalGrowth'
 import { clamp01, smoothstep } from './color'
 

@@ -8,13 +8,8 @@ import { useTimeStore } from './timeStore'
 
 export type { GemstoneId, GeologyState, SoilProfileId }
 
-export type SpeciesId =
-  | 'sunflower'
-  | 'oak'
-  | 'rose'
-  | 'fern'
-  | 'bamboo'
-  | 'ivy'
+export type { SpeciesId } from '../simulation/species'
+import type { SpeciesId } from '../simulation/species'
 
 export interface WeatherState {
   temperature: number // °C

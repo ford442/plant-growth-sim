@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   SPECIES_LSYSTEMS,
+  architectureCap,
   generateLSystem,
   interpretLSystem,
   type LSystemDef,
@@ -157,8 +158,9 @@ describe('LSystemMorph', () => {
     const builder = createMorphBuilder(def)
 
     it('starts as exactly generation n and ends as exactly generation n + 1', () => {
-      // the shipped presets go all the way to the 6 → 7 morph; the synthetic ones stop a step short to keep the suite quick
-      const last = Object.values(BRANCHING).includes(def) ? 5 : MAX_ITERATIONS - 1
+      // every morph up to the species' budget cap; the synthetic ones stop by 5 → 6 to keep the suite quick
+      const cap = architectureCap(def, MAX_ITERATIONS)
+      const last = Math.min(cap, Object.values(BRANCHING).includes(def) ? 6 : cap) - 1
       for (let n = MIN_ITERATIONS; n <= last; n++) {
         const m = builder.morph(n)
         expect(m.isStatic).toBe(false)

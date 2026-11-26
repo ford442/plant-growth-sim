@@ -3,6 +3,8 @@
  * Supports turtle graphics interpretation in 3D.
  */
 
+import type { SpeciesId } from './species'
+
 export interface LSystemRule {
   [symbol: string]: string
 }
@@ -27,6 +29,14 @@ export interface LSystemDef {
   branchRoll?: number
   /** Leaf form for this species; see {@link LeafSpec}. Missing fields fall back to {@link DEFAULT_LEAF}. */
   leaf?: Partial<LeafSpec>
+  /**
+   * Segment budget for one plant. The drawn architecture stops rewriting at the
+   * last iteration that stays within it (see {@link architectureCap}); the sim's
+   * development clock keeps running. Default {@link DEFAULT_MAX_SEGMENTS}.
+   */
+  maxSegments?: number
+  /** Hard iteration cap on top of the segment budget (optional). */
+  maxIterations?: number
 }
 
 export type LeafShape = 'ovate' | 'heart' | 'lanceolate' | 'lobed' | 'pinnate'
@@ -66,7 +76,7 @@ export function leafSpec(def: LSystemDef): LeafSpec {
   return { ...DEFAULT_LEAF, ...def.leaf }
 }
 
-export const SPECIES_LSYSTEMS: Record<string, LSystemDef> = {
+export const SPECIES_LSYSTEMS: Record<SpeciesId, LSystemDef> = {
   sunflower: {
     axiom: 'X',
     rules: {
@@ -156,6 +166,67 @@ export const SPECIES_LSYSTEMS: Record<string, LSystemDef> = {
     leafColor: '#3a8a3a',
     leaf: { shape: 'heart', aspect: 1.05, size: 1.3, spread: 56, fold: 0.06, curl: 0.05 },
   },
+}
+
+/** Default per-plant segment budget: a few thousand, so three plants in the macro bed stay interactive. */
+export const DEFAULT_MAX_SEGMENTS = 8000
+
+export interface ArchitectureStats {
+  /** Iteration actually drawn. */
+  iterations: number
+  symbols: number
+  segments: number
+  leaves: number
+  /** True when the budget held the plant below the requested iteration. */
+  simplified: boolean
+}
+
+/**
+ * Symbol counts of the string after `iterations` rewrites, without building it:
+ * a count per symbol is rewritten through the rules. Exact (integers stay well
+ * under 2^53 for any budgeted plant).
+ */
+function countSymbols(def: LSystemDef, iterations: number): Map<string, number> {
+  let counts = new Map<string, number>()
+  for (const ch of def.axiom) counts.set(ch, (counts.get(ch) ?? 0) + 1)
+  for (let i = 0; i < iterations; i++) {
+    const next = new Map<string, number>()
+    for (const [ch, n] of counts) {
+      for (const c of def.rules[ch] ?? ch) next.set(c, (next.get(c) ?? 0) + n)
+    }
+    counts = next
+  }
+  return counts
+}
+
+function statsAt(def: LSystemDef, iterations: number) {
+  const c = countSymbols(def, iterations)
+  let symbols = 0
+  for (const n of c.values()) symbols += n
+  return {
+    symbols,
+    segments: (c.get('F') ?? 0) + (c.get('G') ?? 0),
+    leaves: (c.get(']') ?? 0) + 1, // one per closed shoot plus the apex
+  }
+}
+
+/**
+ * The highest iteration (≤ `ceiling`) this species draws: the last one whose
+ * segment count fits `maxSegments`, further limited by `maxIterations`.
+ */
+export function architectureCap(def: LSystemDef, ceiling: number): number {
+  const budget = def.maxSegments ?? DEFAULT_MAX_SEGMENTS
+  const hard = Math.min(ceiling, def.maxIterations ?? ceiling)
+  let n = 0
+  while (n < hard && statsAt(def, n + 1).segments <= budget) n++
+  return n
+}
+
+/** What gets drawn when the sim asks for `requested` iterations (clamped to `ceiling`). */
+export function architectureStats(def: LSystemDef, requested: number, ceiling: number): ArchitectureStats {
+  const want = Math.max(0, Math.min(ceiling, Math.floor(requested)))
+  const iterations = Math.min(want, architectureCap(def, ceiling))
+  return { iterations, ...statsAt(def, iterations), simplified: iterations < want }
 }
 
 export function generateLSystem(axiom: string, rules: LSystemRule, iterations: number): string {

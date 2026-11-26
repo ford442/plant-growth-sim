@@ -27,7 +27,8 @@ import { advanceDevelopment, MIN_ITERATIONS, stageOf } from './LSystemMorph'
 import { createSoilState, stepSoil, type SoilProfileId, type SoilState } from './SoilField'
 import { createTissueState, stepTissue, type TissueState } from './TissueGrowth'
 // type-only (erased at build time): the species / weather vocabulary lives with the store
-import type { SpeciesId, WeatherState } from '../stores/simStore'
+import type { SpeciesId } from './species'
+import type { WeatherState } from '../stores/simStore'
 
 /** Longest real-time frame the sim will integrate. A longer one is cut to this. */
 export const MAX_FRAME_SECONDS = 0.1
