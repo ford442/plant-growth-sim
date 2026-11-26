@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useSimStore } from './simStore'
 import { useTimeStore } from './timeStore'
-import { DAYS_PER_ITERATION, MAX_ITERATIONS, MIN_ITERATIONS } from '../simulation/LSystemMorph'
+import { MAX_ITERATIONS, MIN_ITERATIONS } from '../simulation/LSystemMorph'
+import { SPECIES_PHYSIOLOGY } from '../simulation/physiology'
 
 const sim = () => useSimStore.getState()
 
+/** The default species (sunflower) at its own optimum, in full light and still air: relative growth rate 1. */
+const SUNFLOWER = SPECIES_PHYSIOLOGY.sunflower
+const DAYS_PER_ITERATION = SUNFLOWER.iterationEveryDays
 /** Rain keeps the plant turgid, so a test can hold water at 1 and vary only what it is about. */
-const WET = { temperature: 22, light: 1, precipitation: 5, humidity: 0.6, wind: 0 }
+const WET = { temperature: SUNFLOWER.tOpt, light: 1, precipitation: 5, humidity: 0.6, wind: 0 }
 
 beforeEach(() => {
   useTimeStore.getState().play()
@@ -68,7 +72,7 @@ describe('architecture development (L-system progress)', () => {
       { temperature: 22, light: 1 },
       { temperature: 15, light: 0.6 },
       { temperature: 30, light: 0.3 },
-      { temperature: 5, light: 1 },
+      { temperature: 8, light: 1 },
     ]) {
       sim().reset()
       sim().setWeather({ ...WET, ...weather })

@@ -23,7 +23,8 @@
  */
 import { stepCrystal, type CrystalState } from './CrystalGrowth'
 import type { GemstoneId, GeologyState } from './GemstonePresets'
-import { advanceDevelopment, MIN_ITERATIONS, stageOf } from './LSystemMorph'
+import { stageOf } from './LSystemMorph'
+import { createPhysiology, followSoil, growthFactors, stepPhysiology } from './physiology'
 import { createSoilState, stepSoil, type SoilProfileId, type SoilState } from './SoilField'
 import { createTissueState, stepTissue, type TissueState } from './TissueGrowth'
 // type-only (erased at build time): the species / weather vocabulary lives with the store
@@ -134,47 +135,41 @@ export type PlantFields = Pick<
   | 'soil'
 >
 
-/** The documented seedling: day 0, 15 cm, iteration 2, 85 % turgid, full calcium, fresh tissue and soil. */
+/** The documented seedling: day 0, the species' seedling height, iteration 2, 85 % turgid, full calcium, fresh tissue and soil. */
 export function createSeedling(species: SpeciesId, soilProfile: SoilProfileId): PlantFields {
+  const plant = createPhysiology(species)
   return {
     time: 0,
     age: 0,
-    height: 0.15,
-    biomass: 0.1,
-    waterStatus: 0.85,
-    nutrientStatus: 1,
-    growthRate: 0,
-    lsystemProgress: MIN_ITERATIONS,
-    lsystemIterations: MIN_ITERATIONS,
+    height: plant.height,
+    biomass: plant.biomass,
+    waterStatus: plant.waterStatus,
+    nutrientStatus: plant.nutrientStatus,
+    growthRate: plant.growthRate,
+    lsystemProgress: plant.lsystemProgress,
+    lsystemIterations: stageOf(plant.lsystemProgress),
     tissue: createTissueState(species),
     soil: createSoilState(soilProfile, species),
   }
 }
 
-/** Days of lag for plant water / nutrition to follow the soil (hydraulic + tissue buffering). */
-const WATER_LAG_DAYS = 1
-const NUTRIENT_LAG_DAYS = 3
-
 /**
  * One integration step of `days` simulated days. Pure: the input is not mutated.
- * (The steps it composes — soil, tissue, crystal — are pure too.)
+ * (The steps it composes — physiology, soil, tissue, crystal — are pure too.)
+ *
+ * The growth law itself is `physiology.ts`; this only sequences it with the
+ * soil: the kernel grows the plant, the roots draw on the soil at that growth
+ * rate, and plant water then follows what the soil delivered.
  *
  * The iteration count is *derived* here: `lsystemIterations = stageOf(progress)`,
  * and `progress` advances with the weather-driven growth rate, so architecture
  * develops in lockstep with biomass and height. Nothing sets it from outside.
  */
 export function stepPlant(s: PlantSnapshot, days: number): PlantSnapshot {
-  const { species, weather, waterStatus, nutrientStatus, gemstone, geology, lsystemProgress, soilProfile } = s
+  const { species, weather, waterStatus, gemstone, geology, soilProfile } = s
 
-  // very simple growth model for now
-  const tempFactor = Math.max(0, 1 - Math.abs(weather.temperature - 22) / 25)
-  const lightFactor = weather.light
-  const waterFactor = waterStatus
-  // relative growth rate (0-1): scales biomass/height and, through advanceDevelopment,
-  // how fast the architecture develops, so the two can never drift apart
-  const rate = tempFactor * lightFactor * waterFactor * nutrientStatus
-  const growth = days * 0.08 * rate
-  const progress = advanceDevelopment(lsystemProgress, days, rate)
+  const grown = stepPhysiology(s, weather, days)
+  const { temperature: tempFactor, rate } = growthFactors(species, weather, waterStatus, s.nutrientStatus)
 
   // roots draw on the soil; the soil decides how much of the demand they meet
   const soil = stepSoil(
@@ -184,25 +179,20 @@ export function stepPlant(s: PlantSnapshot, days: number): PlantSnapshot {
     { species, biomass: s.biomass, growth: rate, activity: tempFactor * waterStatus },
     days,
   )
+  const plant = followSoil(grown, soil, days)
 
   return {
     ...s,
     time: s.time + days,
     age: s.age + days,
-    height: Math.min(s.height + growth * 0.35, 4.5),
-    biomass: s.biomass + growth,
-    waterStatus: Math.max(
-      0.05,
-      Math.min(1, s.waterStatus + (soil.supply - s.waterStatus) * (1 - Math.exp(-days / WATER_LAG_DAYS))),
-    ),
-    nutrientStatus: Math.min(
-      1,
-      s.nutrientStatus + (soil.nutrient - s.nutrientStatus) * (1 - Math.exp(-days / NUTRIENT_LAG_DAYS)),
-    ),
+    height: plant.height,
+    biomass: plant.biomass,
+    waterStatus: plant.waterStatus,
+    nutrientStatus: plant.nutrientStatus,
+    growthRate: plant.growthRate,
+    lsystemProgress: plant.lsystemProgress,
+    lsystemIterations: stageOf(plant.lsystemProgress),
     soil,
-    growthRate: growth / Math.max(days, 0.001),
-    lsystemProgress: progress,
-    lsystemIterations: stageOf(progress),
     // cambium divides on the same clock, driven by the same weather and turgor
     tissue: stepTissue(
       s.tissue,
