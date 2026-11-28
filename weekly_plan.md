@@ -41,24 +41,24 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 ### Backlog (high value from AGENTS.md)
 - [ ] [#17](https://github.com/ford442/plant-growth-sim/issues/17) Replace lineSegments with tube / instanced cylinder branches  
 - [ ] [#18](https://github.com/ford442/plant-growth-sim/issues/18) Better leaf meshes (instanced planes, orientation)  
-- [ ] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations)  
-- [ ] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division  
-- [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots  
-- [ ] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path  
+- [x] [#14](https://github.com/ford442/plant-growth-sim/issues/14) Smooth growth interpolation (lerp L-system generations) — `LSystemMorph.ts` (lineage through the rewrite; trunk stretches, side branches peel off, buds grow out of their parent, new leaves fade in) driven by the weather-coupled `lsystemProgress`  
+- [x] [#13](https://github.com/ford442/plant-growth-sim/issues/13) Real cellular cross-section + animated division — `TissueGrowth.ts` (cambium / xylem / phloem files, growth rings, drought slows division and enlargement) + cellular view with stem disc and cell lens  
+- [ ] [#10](https://github.com/ford442/plant-growth-sim/issues/10) Soil moisture field + water particles into roots — moisture field done with #12 Phase 4 (`SoilField.ts`, Roots view); water particles still open  
+- [x] [#19](https://github.com/ford442/plant-growth-sim/issues/19) WebGPU / TSL upgrade path — documented in `docs/design/webgpu-tsl.md`; opt-in (`?renderer=webgpu`) WebGPU→WebGL2→WebGL fallback chain and a TSL leaf material (veins, chlorophyll, translucency, wetness, wind). Not yet verified on a native WebGPU device  
 - [ ] [#16](https://github.com/ford442/plant-growth-sim/issues/16) Export plant as GLB  
 
 ### Done (baseline)
 - [x] Vite + React + TS + R3F scaffold  
 - [x] Working L-system + species presets  
 - [x] Weather panel + sim controls  
-- [x] Multi-view scale tabs (stubs for cellular/roots)  
+- [x] Multi-view scale tabs (all four real: cellular as of #13, roots as of #12 Phase 4)  
 
 ---
 
 ## Track B — Gemstone growth ([#1](https://github.com/ford442/plant-growth-sim/issues/1))
 
 ### Status
-**Documented as open GH issue #1** (full implementation plan). Not started in code.
+**Gem mode in code (2026-11-19).** Phase 1 (#11) done; crystal-system habits from #15 and the lattice view + defects / layer growth from #12 Phase 3 done. Phase 4 (#12) done: soil mineral field under the plant, mineral–root interactions (water uptake, calcium nutrition, hardpans) and root-channel geodes / rhizoliths, demoable in the plant Roots view. Open: TSL optical materials (#15, waits on #19).
 
 ### Plan summary (mirror of #1)
 - Phase 1: [#11](https://github.com/ford442/plant-growth-sim/issues/11) `CrystalGrowth.ts`, `GemstoneId` + `GEMSTONE_PRESETS`, env fields, prism/octahedra instances  
@@ -66,19 +66,19 @@ Phase 0 scaffold: L-system grows with age; weather affects growth/water; 4 view 
 - Phase 3–4: [#12](https://github.com/ford442/plant-growth-sim/issues/12) atomic/defect cross-sections + soil mineral field + root/geode co-evolution  
 
 ### Acceptance (from #1)
-- [ ] ≥3 gem types with distinct growth rules  
-- [ ] Macro / structure / lattice views  
-- [ ] T, pressure, saturation controls  
-- [ ] Performance budget respected  
-- [ ] Conventions match plant path  
+- [x] ≥3 gem types with distinct growth rules (6)  
+- [x] Macro / structure / lattice views  
+- [x] T, pressure, saturation controls (+ dopant, P–T diagram)  
+- [x] Performance budget respected (~2 ms JS / frame)  
+- [x] Conventions match plant path  
 
 ---
 
 ## Track C — *Toxoplasma gondii* sim-game mode
 
 ### Status
-**Research ingested** into `docs/research/toxoplasma-gondii-parameters.md` (Gemini Deep Research).  
-**Epic GH issue: [#3](https://github.com/ford442/plant-growth-sim/issues/3).** **No simulation code yet.**
+**Parasite mode in code (2026-11-19).** C0–C5 all landed in one pass: design lock (`docs/design/parasite-mode.md`), pure stage FSM + BFD1 switch + `parasiteStore`, glideosome/moving-junction/egress biomechanics, host immunity fields + niches, four-scale `ParasiteViewer`, and the objective layer with challenge modifiers. 51 unit tests cover the pure sim (`npm test`).  
+**Epic GH issue: [#3](https://github.com/ford442/plant-growth-sim/issues/3).**
 
 ### Design intent
 Strange multi-scale **objective-driven** sim: play the life cycle (tachyzoite ↔ bradyzoite/cyst ↔ oocyst/sporozoite ↔ felid sexual stage) with biomechanically grounded systems (glideosome traction, moving junction, BFD1 lock, PLP1 egress) rather than generic “virus tycoon.”
@@ -93,40 +93,42 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ### Implementation phases (proposed)
 
-#### C0 — Design lock — [#9](https://github.com/ford442/plant-growth-sim/issues/9)
+#### C0 — Design lock — [#9](https://github.com/ford442/plant-growth-sim/issues/9) ✅
 - [x] Morphological parameter tables  
 - [x] Translational FSM / MJ / egress / BFD1 specs from research  
-- [ ] Art + tone (educational surreal vs clinical) + content framing  
-- [ ] Session time-scale mapping (7 h doubling → player time)  
-- [ ] First playable objective (recommend: “encyst without killing host”)  
+- [x] Art + tone (educational surreal, mechanism-first) + content framing  
+- [x] Session time-scale mapping — **two gears**: action seconds (4/s at 1×) and lesion hours (0.9/s at 1×), both shown in the HUD  
+- [x] First playable objective locked: **Quiet tenant** — 8 mature cysts, host above 20% health  
 
-#### C1 — Stage FSM + pure sim — [#8](https://github.com/ford442/plant-growth-sim/issues/8)
-- [ ] `LifeStage` enum + dimension presets  
-- [ ] Host types: intermediate tissue, felid enterocyte, environment  
-- [ ] Timers: endodyogeny ~7 h, sporulation 1–5 d, oocyst viability  
-- [ ] BFD1/BFD2 stress feedback (latency lock + reactivation on immunity collapse)  
+#### C1 — Stage FSM + pure sim — [#8](https://github.com/ford442/plant-growth-sim/issues/8) ✅
+- [x] `LifeStage` enum + dimension presets (`stages.ts`)  
+- [x] Host types: intermediate tissue, felid enterocyte, environment  
+- [x] Timers: endodyogeny ~7 h, sporulation 1–5 d, oocyst shelf life  
+- [x] BFD1/BFD2 stress feedback (latency lock + reactivation on immunity collapse)  
 
-#### C2 — Motility & invasion sandbox — [#4](https://github.com/ford442/plant-growth-sim/issues/4)
-- [ ] Glideosome helical inward-traction kinematics (not freeflight)  
-- [ ] MJ sequence: MIC → orient → RON/AMA1 ring → PV  
-- [ ] Egress: FNT acidify → Ca²⁺ → TgPLP1 pores  
+#### C2 — Motility & invasion sandbox — [#4](https://github.com/ford442/plant-growth-sim/issues/4) ✅
+- [x] Glideosome helical inward-traction kinematics (not freeflight)  
+- [x] MJ sequence: MIC → orient → RON/AMA1 ring → PV, with AMA1 shedding as a real failure mode  
+- [x] Egress: FNT acidify → Ca²⁺ → TgPLP1 pores, plus the Δplp1 trapped path  
+- [x] Single-cell lytic sandbox ("Lytic cycle" view): one seeded loop glide → attach → invade → PV → endodyogeny → egress, with ΔPLP1 and RNG2-loss flags  
 
-#### C3 — Host field + immunity game — [#5](https://github.com/ford442/plant-growth-sim/issues/5)
-- [ ] ROS / IL-12 / IFN-γ / IRG pressure fields  
-- [ ] ROP16 M2 debuff; ROP18/5 IRG shield; TgIST optional  
-- [ ] Tissue niches: muscle, retina, amygdala-weighted CNS  
+#### C3 — Host field + immunity game — [#5](https://github.com/ford442/plant-growth-sim/issues/5) ✅
+- [x] ROS / IL-12 / IFN-γ / IRG / NO pressure fields  
+- [x] ROP16 M2 debuff; ROP18/5 IRG shield; TgIST  
+- [x] Tissue niches: skeletal + cardiac muscle, retina, CNS cortex, amygdala  
 
-#### C4 — Multi-scale R3F views — [#6](https://github.com/ford442/plant-growth-sim/issues/6)
-- [ ] Macro host / environment map  
-- [ ] Tissue slice with cysts (5–70 µm growth)  
-- [ ] Single-cell PV + endodyogeny  
-- [ ] Organelle close-up (apicoplast, conoid 400×250 nm)  
+#### C4 — Multi-scale R3F views — [#6](https://github.com/ford442/plant-growth-sim/issues/6) ✅
+- [x] Environment / soil oocyst field  
+- [x] Tissue view with cysts (5–70 µm growth) and instanced zoites + traction rings  
+- [x] Cyst garden (tissue slice): hex host-cell mosaic, cysts at real µm with fresnel wall rim, bradyzoite crescents under a LOD budget, scale bar, hover tooltip, tissue palette picker — 5 draw calls at 200 cysts / ~20 k bradyzoites; instancing guard + adaptive LOD borrowed from ford442/watershed  
+- [x] Single-cell PV with rosette, junction ring and PLP1 pores  
+- [x] Organelle close-up (22 MTs, 14-fibre conoid, apicoplast, rhoptries, micronemes)  
 
-#### C5 — Objectives & surreal win states — [#7](https://github.com/ford442/plant-growth-sim/issues/7)
-- [ ] Life-cycle completion (felid oocyst shed)  
-- [ ] Environmental oocyst endurance  
-- [ ] ΔBFD1 / ΔPLP1 challenge modifiers  
-- [ ] Optional comparative presets: *Neospora*, *Hammondia*, *Besnoitia*  
+#### C5 — Objectives & surreal win states — [#7](https://github.com/ford442/plant-growth-sim/issues/7) ✅
+- [x] Life-cycle completion (felid gametogony → oocyst shed → new host)  
+- [x] Environmental oocyst endurance (365 shelf days)  
+- [x] ΔBFD1 / Δplp1 / ΔMIC2 / terminal-latency challenge modifiers  
+- [x] Comparative presets: *Neospora*, *Hammondia*, *Besnoitia*  
 
 ### Bizarre / high-signal facts to keep in design (from research)
 - 22 subpellicular MTs + 14-fiber conoid; RNG2 loss → total immotility  
@@ -138,19 +140,19 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 - *H. hammondi* as “no reactivation” alternate mode  
 
 ### Acceptance criteria (v0 playable)
-- [ ] Switchable mode from plant UI without breaking plant tick loop  
-- [ ] At least tachyzoite / bradyzoite-cyst / oocyst states with correct relative scales  
-- [ ] One full lytic-cycle loop: invade → PV → replicate → egress  
-- [ ] One stress path into latency (BFD1)  
-- [ ] One documented objective with win/lose  
-- [ ] Parameters sourced/traceable to research doc  
+- [x] Switchable mode from plant UI without breaking plant tick loop  
+- [x] Tachyzoite / bradyzoite-cyst / oocyst states with correct relative scales  
+- [x] One full lytic-cycle loop: invade → PV → replicate → egress  
+- [x] One stress path into latency (BFD1)  
+- [x] Five documented objectives with win/lose  
+- [x] Parameters sourced/traceable to research doc  
 
 ---
 
 ## Cross-cutting
 
-- [ ] Mode switcher in shell UI (`plant` | `gem` | `parasite`) — only when second mode is non-stub  
-- [ ] Shared time / pause / speed controls  
+- [x] Mode switcher in shell UI (`plant` | `gem` | `parasite`)  
+- [x] Shared time / pause / speed controls (`SimClock`)  
 - [ ] Docs Diátaxis later under `/docs` (tutorial / how-to / reference / explanation)  
 - [ ] Do not break Zustand plant tick loop when adding modes  
 
@@ -165,7 +167,19 @@ Reuse: tick loop patterns from `simStore`, multi-scale UI from plant views, pres
 
 ---
 
+## Next for Track C
+
+- [ ] Felid gut deserves its own view scale (enterocytes + endopolygeny), currently reuses the tissue scene
+- [ ] Congenital / vertical transmission route (research §1, path 4)
+- [ ] TSL materials for the pellicle and cyst wall once the WebGPU path lands (#19)
+- [ ] Share the soil mineral field (#12 Phase 4, `SoilField.ts`) with the oocyst field — oocysts and geodes in one substrate
+
 ## Last updated
+
+- **2026-11-22** — Parasite C4 first slice: the **Cyst garden** tab (`TissueSliceView`, `slice/*`, `SlicePanels`, `sliceViewStore`). Four instanced meshes + underlay (5 draw calls) at 200 cysts / ~20 k bradyzoites, LOD tiers with adaptive stepping, `?stress=200` / `?lod=` switches. GPU frame rate not yet measured on real hardware.
+- **2026-11-20** — Gem #12 Phase 4 landed: `src/simulation/SoilField.ts` (soil water + silica/calcite field, roots, cement, nodules) drives plant water status and calcium nutrition; the Roots tab is a real soil slice (`soil/SoilView`, `SoilPanel`) with geodes that open in gem mode.
+- **2026-11-20** — Plant #13 landed: the Cellular tab is a real stem cross-section (`src/simulation/TissueGrowth.ts`, `CellularView`, `TissuePanel`) with animated mitosis / expansion, growth rings and weather-driven division. Gem and parasite modes untouched.
+- **2026-11-19** — Track C landed end to end: C0 design lock (`docs/design/parasite-mode.md`), C1–C5 implemented in `src/simulation/parasite/` + `parasiteStore` + `ParasiteViewer`, 51 unit tests. Plant and gem modes untouched.
 
 - **2026-08-12** — Created weekly plan; mirrored gem #1; ingested Gemini *T. gondii* research; opened parasite epic **#3**.  
 - **2026-08-12** — Filed child issues: parasite **#9–#4** (C0–C5 order: #9 C0, #8 C1, #4 C2, #5 C3, #6 C4, #7 C5); plant **#17 #18 #14 #13 #10 #19 #16**; gem **#11 #15 #12**.
