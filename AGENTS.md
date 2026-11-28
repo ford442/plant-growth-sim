@@ -10,12 +10,17 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Weather (temp, light, humidity, rain, wind) driving growth rates and stress
 
 ## Tech Stack
-- Vite 6 + React 19 + TypeScript
-- React Three Fiber + Three.js (WebGPU preferred later)
+- Vite 6 + React 19 + TypeScript 5.7
+- React Three Fiber 9 + drei + Three.js 0.175 (WebGPU preferred later)
 - Zustand for sim state
 - L-systems + simple FSPM-style biomass model
 
 ## Key Files
+- `src/simulation/LSystem.ts` — rules + turtle interpreter per species
+- `src/App.tsx` — layout; defines `ViewScale` (`macro | architecture | cellular | roots`)
+- `src/components/PlantViewer.tsx` — R3F scene that switches on `ViewScale`; drives `tick(dt)` from `useFrame`
+- `src/components/WeatherPanel.tsx`, `SimControls.tsx`, `SpeciesSelector.tsx`, `ScaleTabs.tsx` — UI
+- `weekly_plan.md` — living task board (plant core + planned gem and *T. gondii* parasite modes); research in `docs/research/`
 - `src/stores/simStore.ts` — single source of truth for time, weather, plant status, gem state (`mode`, `gemstone`, `geology`, `crystal`)
 - `src/stores/modeStore.ts` — `mode: 'plant' | 'gem' | 'parasite'`; `src/stores/timeStore.ts` — shared play/pause + speed (one clock for all modes)
 - `src/rendering/` — renderer bootstrap (`rendererFactory`: classic WebGL by default; `webgpu` = `WebGPURenderer`, on its WebGL2 backend without an adapter, and a plain `WebGLRenderer` if that fails), capability probe, `rendererPreference.ts` (`?renderer=webgpu`; `NODE_READY_MODES` = which modes may use it), `describeRenderer()` (what is *actually* running), GPU-loss handling, `RendererLifecycle` (reports the active renderer + GPU-loss handlers; it must **not** dispose the renderer — R3F does, and doing it twice blanks the canvas under StrictMode). `createRenderer.ts` is also the one place that names every context flag (`CONTEXT_FLAGS`: MSAA, opaque, depth on, stencil off, **`logarithmicDepthBuffer` on**), the output pipeline (`OUTPUT`: ACES filmic + sRGB, applied in `<Canvas onCreated>` via `configureOutput`) and the key-light shadow (`KEY_LIGHT_SHADOW`; `<Canvas shadows="percentage">`, only plant mode's light sets `castShadow`, branches + leaves cast onto the ground disk). A hand-written `ShaderMaterial` must include the `logdepthbuf_*` chunks (see `parasite/slice/wallShader.ts`) or its depth will not match the built-in materials `src/stores/rendererStore.ts` + `components/RendererPanel.tsx` are the UI side. Design + upgrade path: `docs/design/webgpu-tsl.md`
@@ -83,7 +88,7 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 - Gemstone presets live in `GEMSTONE_PRESETS` (`Record<GemstoneId, …>`, so TypeScript flags a missing entry)
 - Views derive geometry from pure state each frame (`useSimStore.getState()` in `useFrame`) instead of subscribing to per-tick values
 - Dark botanical UI (greens on near-black)
-- Diátaxis docs later under `/docs`
+- Diátaxis docs later under `/docs` (currently only `docs/research/`)
 
 ## Current Status (Phase 0)
 - Scaffold complete
@@ -107,8 +112,11 @@ Interactive multi-scale browser simulation of plant growth (flowers + trees):
 ## Running Locally
 ```bash
 npm install
-npm run dev
+npm run dev       # Vite dev server
+npm run build     # tsc -b && vite build
+npm run preview
 ```
+`npm run lint` (`eslint .`) currently has no `eslint.config.js`, so it will fail until one is added.
 
 Tests (pure simulation only, no DOM):
 ```bash
@@ -120,6 +128,8 @@ npm test
 - ~~Mineral–root co-evolution~~ (done: `SoilField.ts` + Roots view). Next: share the substrate with the parasite oocyst field; carry a soil geode's own conditions into the gem crystal instead of the amethyst defaults
 
 ## Notes for Agents
+- Do not break the Zustand tick loop
+- When adding species, update the `SpeciesId` type, `SPECIES_LSYSTEMS`, and the `SPECIES` list in `SpeciesSelector.tsx`
 - Do not break the Zustand tick loop. Time flows one way: `clockDriver` (real `dt`) → `simStore.tick` → `advancePlant` (clamp → accumulator → fixed steps). Do not call `tick` from a `useFrame`, do not integrate with a raw frame `dt`, and do not add a second `requestAnimationFrame` clock. Play / pause / speed stay on `timeStore`; the accumulator is `simStore.clockAccumulator` (zeroed by `reset()`). `tick(0.1)` is **three** steps of 1/30 s, not one of 0.1 — the model is explicit-Euler, so results depend (≈ 6 % on a day's development between a 1-day step and 30 steps) on step size; that is why the step is fixed. `clock.test.ts` pins hitch clamping, frame-rate independence, pause and the seedling
 - Architecture development is `simStore.lsystemProgress` (continuous; `lsystemIterations` is its integer part). It advances by `days × rate / iterationEveryDays` (the species' own pace in `SPECIES_PHYSIOLOGY`; `DAYS_PER_ITERATION` is only the default), where `rate` is the same weather-driven factor that scales biomass and height, so branching slows, stalls and pauses with growth. Do not drive it from `age` again — that desyncs architecture from the weather
 - The L-system morph is pure and unit-tested (`LSystemMorph.test.ts`, `leafMatrix.test.ts`, `simStore.test.ts`) — run `npm test` after touching `LSystem.ts` or the morph. Interpolation lives in the viewer layer (`useFrame` samples the morph from `useSimStore.getState().lsystemProgress`); the sim never sees the interpolation factor
